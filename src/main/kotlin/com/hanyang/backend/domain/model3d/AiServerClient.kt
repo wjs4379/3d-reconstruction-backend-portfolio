@@ -13,11 +13,7 @@ import reactor.core.publisher.Mono
  * - 프론트는 AI 서버를 직접 호출하지 않습니다.
  * - 프론트 → 백엔드 → AI 서버 순서로 갑니다.
  *
- * 현재 AI 서버 주소는 application.yaml에 있습니다.
- *
- * ai:
- *   server:
- *     base-url: "http://localhost:8000"
+ * AI 서버 주소는 application.yaml의 ai.server.base-url 설정에서 주입받습니다.
  */
 @Component
 class AiServerClient(
@@ -38,14 +34,7 @@ class AiServerClient(
      * WebClient는 외부 서버로 HTTP 요청을 보낼 때 사용합니다.
      * 여기서는 AI 서버를 호출하기 위해 사용합니다.
      *
-     * baseUrl = http://localhost:8000
-     *
-     * 그래서 아래에서 .uri("/api/v1/rooms/analyze")를 쓰면
-     * 최종 요청 URL은:
-     *
-     * http://localhost:8000/api/v1/rooms/analyze
-     *
-     * 이 됩니다.
+     * 요청 기준 주소는 환경별 설정값인 aiServerBaseUrl을 사용합니다.
      */
     private val webClient: WebClient by lazy {
         WebClient.builder()

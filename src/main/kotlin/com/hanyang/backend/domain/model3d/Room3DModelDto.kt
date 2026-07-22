@@ -13,6 +13,7 @@ data class AnalyzeModelRequest(
     @field:NotEmpty(message = "이미지 URL은 최소 1개 이상 필요합니다.")
     val imageUrls: List<@NotBlank(message = "비어 있는 이미지 URL은 전송할 수 없습니다.") String>
 )
+
 // 프론트가 보정한 vertices/edges를 백엔드에 넘길 때 사용
 // 동시에 AI 서버의 CorrectionRequestDTO 형식과도 맞춤
 data class CorrectionRequestDto(
