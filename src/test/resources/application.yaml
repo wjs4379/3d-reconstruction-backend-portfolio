@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:spatial_asset_test;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        show_sql: false
+        format_sql: false
+
+ai:
+  server:
+    base-url: http://localhost:9999
+
+app:
+  webhook-url: http://localhost:8080/api/webhook
+  jwt:
+    secret: test-only-jwt-secret-with-at-least-32-bytes
