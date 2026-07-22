@@ -2,6 +2,8 @@ package com.hanyang.backend.domain.model3d
 
 import com.hanyang.backend.domain.room.Room
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.UUID
@@ -11,7 +13,8 @@ enum class ModelStatus {
     ANALYZING,               // Phase 1: 이미지 분석 중
     WAITING_FOR_CORRECTION,  // 분석 완료, 프론트의 보정(Correction)을 기다리는 중 🌟
     RECONSTRUCTING,          // Phase 2: 보정 완료 후 3D 재구성 중
-    SUCCESS,                 // 최종 GLB 생성 완료
+    WAITING_FOR_MODEL_UPLOAD, // 최종 좌표 생성 완료, 프론트의 모델 업로드를 기다리는 중
+    SUCCESS,                 // 프론트가 생성한 최종 모델 URL 등록 완료
     FAILED                   // 실패
 }
 @Entity
@@ -45,7 +48,8 @@ class Room3DModel(
 
     // String 대신 Enum 사용으로 타입 안정성 확보
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 40)
     var status: ModelStatus = ModelStatus.ANALYZING,
 
     // 🌟 핵심: 프론트와 합의한 3D 가상 공간 좌표 JSON 데이터를 통째로 저장하는 컬럼

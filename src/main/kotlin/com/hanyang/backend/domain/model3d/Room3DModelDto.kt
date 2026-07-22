@@ -1,8 +1,11 @@
 package com.hanyang.backend.domain.model3d
 
-import com.fasterxml.jackson.annotation.JsonAlias
+import jakarta.validation.constraints.Digits
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotEmpty
+import jakarta.validation.constraints.Positive
+import jakarta.validation.constraints.Size
+import java.math.BigDecimal
 
 // ===============================
 // 프론트 -> 백엔드 요청 DTO
@@ -22,6 +25,20 @@ data class CorrectionRequestDto(
     val edges: List<EdgeDto>
 )
 
+// AI가 생성한 최종 좌표로 프론트가 모델 파일을 만든 뒤 업로드 결과를 전달할 때 사용
+data class ModelUploadResultRequest(
+    @field:NotBlank(message = "최종 모델 URL은 필수입니다.")
+    @field:Size(max = 2048, message = "최종 모델 URL은 2048자를 초과할 수 없습니다.")
+    val modelUrl: String,
+
+    @field:Positive(message = "파일 크기는 양수여야 합니다.")
+    @field:Digits(integer = 8, fraction = 2, message = "파일 크기는 정수 8자리와 소수 2자리까지 허용됩니다.")
+    val fileSizeMb: BigDecimal? = null,
+
+    @field:Size(max = 20, message = "파일 포맷은 20자를 초과할 수 없습니다.")
+    val format: String? = null
+)
+
 
 // ===============================
 // 공통 좌표/간선 DTO
@@ -32,7 +49,8 @@ data class VertexDto(
     val x: Double,
     val y: Double,
     val z: Double,
-    val imageIndex: Int? = null
+    val imageIndex: Int? = null,
+    val sourceVertexId: String? = null
 )
 
 data class EdgeDto(
@@ -84,18 +102,15 @@ data class AiRoomResponseDto(
     val userId: String? = null,
     val status: String? = null,
 
-    val aiVertices: List<VertexDto> = emptyList(),
-    val aiEdges: List<EdgeDto> = emptyList(),
+    val aiVertices: List<VertexDto>? = null,
+    val aiEdges: List<EdgeDto>? = null,
 
     val correctedVertices: List<VertexDto> = emptyList(),
     val correctedEdges: List<EdgeDto> = emptyList(),
 
     val isCorrected: Boolean = false,
 
-    val finalVertices: List<VertexDto> = emptyList(),
-    val finalEdges: List<EdgeDto> = emptyList(),
-
-    @field:JsonAlias("model_url", "glbUrl", "glb_url", "resultUrl", "result_url")
-    val modelUrl: String? = null
+    val finalVertices: List<VertexDto>? = null,
+    val finalEdges: List<EdgeDto>? = null
 )
 

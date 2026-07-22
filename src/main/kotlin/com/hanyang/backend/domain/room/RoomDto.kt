@@ -3,7 +3,6 @@ package com.hanyang.backend.domain.room
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Positive
-import java.math.BigDecimal
 
 enum class RenderStatus {
     ANALYZING,
@@ -49,8 +48,5 @@ data class RoomCreateResponse(
 data class AiWebhookRequest(
     val aiRoomId: String,
     val status: RenderStatus,
-    val modelUrl: String?,
-    val fileSizeMb: BigDecimal?,
-    val format: String?,
     val roomDataJson: String?
 )

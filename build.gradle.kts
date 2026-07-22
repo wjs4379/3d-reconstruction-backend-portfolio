@@ -64,7 +64,8 @@ dependencies {
 	testImplementation("org.springframework.boot:spring-boot-starter-webflux-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-websocket-test")
-	testRuntimeOnly("com.h2database:h2")
+	// H2 2.4.240 has a regression around enum CHECK constraints in multi-session JPA tests.
+	testRuntimeOnly("com.h2database:h2:2.3.232")
 
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 }

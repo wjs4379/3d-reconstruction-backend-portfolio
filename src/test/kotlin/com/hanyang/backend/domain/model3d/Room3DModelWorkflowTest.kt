@@ -1,6 +1,8 @@
 package com.hanyang.backend.domain.model3d
 
 import com.hanyang.backend.domain.property.Property
+import com.hanyang.backend.domain.room.AiWebhookRequest
+import com.hanyang.backend.domain.room.RenderStatus
 import com.hanyang.backend.domain.room.Room
 import com.hanyang.backend.domain.room.RoomRepository
 import com.hanyang.backend.domain.user.User
@@ -10,8 +12,10 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
+import org.springframework.transaction.support.TransactionOperations
 import reactor.core.publisher.Mono
 import tools.jackson.databind.json.JsonMapper
+import java.math.BigDecimal
 import java.util.Optional
 
 class Room3DModelWorkflowTest {
@@ -31,6 +35,7 @@ class Room3DModelWorkflowTest {
             room3DModelRepository = modelRepository,
             aiServerClient = aiClient,
             jsonMapper = JsonMapper.builder().build(),
+            transactionOperations = TransactionOperations.withoutTransaction(),
             webhookUrl = "http://localhost:8080/api/webhook"
         )
     }
@@ -82,13 +87,89 @@ class Room3DModelWorkflowTest {
             edges = emptyList()
         )
 
-        Mockito.`when`(modelRepository.findTopByRoomIdOrderByUploadedAtDesc(1L))
+        Mockito.`when`(modelRepository.findFirstByRoomIdOrderByUploadedAtDesc(1L))
             .thenReturn(Optional.of(model))
 
         val response = service.applyCorrectionAndReconstruct(1L, correction)
 
         assertEquals(ModelStatus.RECONSTRUCTING, response.status)
         assertEquals(listOf("correction", "reconstruct"), aiClient.executionOrder)
+    }
+
+    @Test
+    fun `AI 최종 좌표 완료 후 프론트 모델 업로드 결과로 최종 성공한다`() {
+        val room = createRoom()
+        val model = Room3DModel(
+            id = 10L,
+            room = room,
+            aiRoomId = "ai-room-id",
+            originalImageUrl = "https://example.com/room.jpg",
+            status = ModelStatus.WAITING_FOR_CORRECTION
+        )
+        val correction = CorrectionRequestDto(
+            vertices = listOf(
+                VertexDto(
+                    id = "vertex-1",
+                    x = 1.0,
+                    y = 2.0,
+                    z = 3.0,
+                    imageIndex = 0
+                )
+            ),
+            edges = emptyList()
+        )
+        val finalRoomData =
+            """{"finalVertices":[{"id":"vertex-1","x":1.0,"y":2.0,"z":3.0}],"finalEdges":[]}"""
+
+        Mockito.`when`(modelRepository.findFirstByRoomIdOrderByUploadedAtDesc(1L))
+            .thenReturn(Optional.of(model))
+        Mockito.`when`(modelRepository.findTopByRoomIdOrderByUploadedAtDesc(1L))
+            .thenReturn(Optional.of(model))
+        Mockito.`when`(modelRepository.findByAiRoomIdForUpdate("ai-room-id"))
+            .thenReturn(Optional.of(model))
+        Mockito.`when`(modelRepository.findByIdAndRoomId(10L, 1L))
+            .thenReturn(Optional.of(model))
+
+        val reconstructing = service.applyCorrectionAndReconstruct(1L, correction)
+
+        assertEquals(ModelStatus.RECONSTRUCTING, reconstructing.status)
+
+        service.handleAiWebhook(
+            AiWebhookRequest(
+                aiRoomId = "ai-room-id",
+                status = RenderStatus.SUCCESS,
+                roomDataJson = finalRoomData
+            )
+        )
+
+        val waitingForUpload = service.getModelStatus(1L)
+        val waitingRoomData = waitingForUpload.roomData as Map<*, *>
+
+        assertEquals(ModelStatus.WAITING_FOR_MODEL_UPLOAD, waitingForUpload.status)
+        assertEquals(null, waitingForUpload.modelUrl)
+        assertEquals(1, (waitingRoomData["finalVertices"] as List<*>).size)
+        assertEquals(emptyList<Any>(), waitingRoomData["finalEdges"])
+
+        val completed = service.completeModelUpload(
+            roomId = 1L,
+            modelId = 10L,
+            request = ModelUploadResultRequest(
+                modelUrl = "https://example.com/models/room.glb",
+                fileSizeMb = BigDecimal("12.34"),
+                format = "GLB"
+            )
+        )
+        val finalStatus = service.getModelStatus(1L)
+        val completedRoomData = finalStatus.roomData as Map<*, *>
+
+        assertEquals(ModelStatus.SUCCESS, completed.status)
+        assertEquals("https://example.com/models/room.glb", completed.modelUrl)
+        assertEquals(ModelStatus.SUCCESS, finalStatus.status)
+        assertEquals("https://example.com/models/room.glb", finalStatus.modelUrl)
+        assertEquals(BigDecimal("12.34"), model.fileSizeMb)
+        assertEquals("glb", model.format)
+        assertEquals(1, (completedRoomData["finalVertices"] as List<*>).size)
+        assertEquals(emptyList<Any>(), completedRoomData["finalEdges"])
     }
 
     @Test

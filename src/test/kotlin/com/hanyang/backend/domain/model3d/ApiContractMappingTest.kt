@@ -3,12 +3,11 @@ package com.hanyang.backend.domain.model3d
 import com.hanyang.backend.domain.room.RoomController
 import com.hanyang.backend.domain.room.WebhookController
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestMapping
 
 class ApiContractMappingTest {
@@ -37,14 +36,17 @@ class ApiContractMappingTest {
                     ?.singleOrNull()
             }
             .toSet()
+        val modelPutPaths = Room3DModelController::class.java.declaredMethods
+            .mapNotNull { method ->
+                method.getAnnotation(PutMapping::class.java)
+                    ?.value
+                    ?.singleOrNull()
+            }
+            .toSet()
 
         assertEquals(setOf("/analyze", "/reconstruct", "/refresh"), modelPostPaths)
         assertEquals(setOf("/status"), modelGetPaths)
-        assertFalse(
-            Room3DModelController::class.java.declaredMethods.any {
-                it.isAnnotationPresent(PatchMapping::class.java)
-            }
-        )
+        assertEquals(setOf("/{modelId}/result"), modelPutPaths)
     }
 
     @Test
@@ -54,6 +56,16 @@ class ApiContractMappingTest {
 
         assertTrue(
             reconstruct.parameterTypes.contains(CorrectionRequestDto::class.java)
+        )
+    }
+
+    @Test
+    fun `최종 결과 API는 프론트 모델 업로드 요청을 본문으로 받는다`() {
+        val completeModelUpload = Room3DModelController::class.java.declaredMethods
+            .single { it.name == "completeModelUpload" }
+
+        assertTrue(
+            completeModelUpload.parameterTypes.contains(ModelUploadResultRequest::class.java)
         )
     }
 

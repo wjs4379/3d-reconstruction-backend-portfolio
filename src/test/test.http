@@ -1,5 +1,6 @@
 @baseUrl = http://localhost:8080
 @roomId = 1
+@modelId = replace-with-model-id-from-analyze-or-status-response
 @aiRoomId = replace-with-ai-room-id-from-log-or-db
 @imageUrl1 = https://example.com/room-1.jpg
 @imageUrl2 = https://example.com/room-2.jpg
@@ -38,10 +39,7 @@ Content-Type: application/json
 {
   "aiRoomId": "{{aiRoomId}}",
   "status": "WAITING_FOR_CORRECTION",
-  "roomDataJson": "{\"vertices\":[{\"id\":\"vertex-1\",\"x\":10.0,\"y\":20.0,\"z\":0.0,\"imageIndex\":0}],\"edges\":[]}",
-  "modelUrl": null,
-  "fileSizeMb": null,
-  "format": null
+  "roomDataJson": "{\"aiVertices\":[{\"id\":\"vertex-1\",\"x\":10.0,\"y\":20.0,\"z\":0.0,\"imageIndex\":0}],\"aiEdges\":[]}"
 }
 
 ### 4. 상태 조회: WAITING_FOR_CORRECTION 및 roomData JSON 객체 예상
@@ -76,12 +74,23 @@ Content-Type: application/json
 {
   "aiRoomId": "{{aiRoomId}}",
   "status": "SUCCESS",
-  "roomDataJson": "{\"vertices\":[{\"id\":\"vertex-1\",\"x\":12.0,\"y\":21.0,\"z\":3.0,\"imageIndex\":0}],\"edges\":[]}",
+  "roomDataJson": "{\"finalVertices\":[{\"id\":\"vertex-1\",\"x\":12.0,\"y\":21.0,\"z\":3.0,\"imageIndex\":0}],\"finalEdges\":[]}"
+}
+
+### 7. 상태 조회: WAITING_FOR_MODEL_UPLOAD, modelUrl=null, 최종 roomData 객체 예상
+GET {{baseUrl}}/api/rooms/{{roomId}}/models/status
+Accept: application/json
+
+### 8. 프론트 최종 모델 업로드 결과 등록
+PUT {{baseUrl}}/api/rooms/{{roomId}}/models/{{modelId}}/result
+Content-Type: application/json
+
+{
   "modelUrl": "https://example.com/models/test-room.glb",
   "fileSizeMb": 12.34,
   "format": "glb"
 }
 
-### 7. 상태 조회: SUCCESS, modelUrl, roomData 객체 예상
+### 9. 상태 조회: SUCCESS, modelUrl, 최종 roomData 객체 예상
 GET {{baseUrl}}/api/rooms/{{roomId}}/models/status
 Accept: application/json

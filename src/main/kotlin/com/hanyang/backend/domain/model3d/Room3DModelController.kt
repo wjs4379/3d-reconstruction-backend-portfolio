@@ -46,6 +46,17 @@ class Room3DModelController(
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response)
     }
 
+    /** 프론트가 최종 모델 파일을 업로드한 뒤 URL과 메타데이터를 저장합니다. */
+    @PutMapping("/{modelId}/result")
+    fun completeModelUpload(
+        @PathVariable roomId: Long,
+        @PathVariable modelId: Long,
+        @RequestBody @Valid request: ModelUploadResultRequest
+    ): ResponseEntity<ModelStatusResponse> {
+        val response = room3DModelService.completeModelUpload(roomId, modelId, request)
+        return ResponseEntity.ok(response)
+    }
+
     /**
      * AI 서버 상태를 다시 가져와서 백엔드 DB에 반영
      *
