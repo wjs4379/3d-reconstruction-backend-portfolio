@@ -1,0 +1,162 @@
+﻿{
+    "generatedAtUtc":  "2026-08-10T04:34:03.0308666Z",
+    "methodology":  {
+                        "order":  [
+                                      "baseline",
+                                      "outbox"
+                                  ],
+                        "requestRatePerSecond":  10,
+                        "duration":  "2s",
+                        "observationSeconds":  30,
+                        "workerMaxConcurrency":  3,
+                        "fakeAiMaxInFlight":  2,
+                        "fakeAiAcceptDelayMs":  1000,
+                        "fakeAiAnalysisDelayMs":  300
+                    },
+    "modes":  {
+                  "baseline":  {
+                                   "trialCount":  1,
+                                   "backendRequests":  21,
+                                   "backendAccepted202":  21,
+                                   "backendUnexpected":  0,
+                                   "droppedIterations":  0,
+                                   "responseTimeMs":  {
+                                                          "runAverage":  {
+                                                                             "median":  150.66757619047621,
+                                                                             "minimum":  150.66757619047621,
+                                                                             "maximum":  150.66757619047621
+                                                                         },
+                                                          "p95":  {
+                                                                      "median":  421.3161,
+                                                                      "minimum":  421.3161,
+                                                                      "maximum":  421.3161
+                                                                  },
+                                                          "p99":  {
+                                                                      "median":  506.42274,
+                                                                      "minimum":  506.42274,
+                                                                      "maximum":  506.42274
+                                                                  },
+                                                          "maximum":  {
+                                                                          "median":  527.6994,
+                                                                          "minimum":  527.6994,
+                                                                          "maximum":  527.6994
+                                                                      }
+                                                      },
+                                   "ai":  {
+                                              "httpRequests":  21,
+                                              "accepted":  4,
+                                              "rejected":  17,
+                                              "duplicates":  0,
+                                              "uniqueExecutions":  4,
+                                              "completed":  4,
+                                              "webhookSucceeded":  4,
+                                              "webhookFailed":  0,
+                                              "acceptanceRateAgainstBackendRequests":  0.19047619047619047,
+                                              "maxObservedInFlight":  2
+                                          },
+                                   "database":  {
+                                                    "waitingForCorrection":  4,
+                                                    "failed":  17,
+                                                    "outboxSent":  0
+                                                }
+                               },
+                  "outbox":  {
+                                 "trialCount":  1,
+                                 "backendRequests":  21,
+                                 "backendAccepted202":  21,
+                                 "backendUnexpected":  0,
+                                 "droppedIterations":  0,
+                                 "responseTimeMs":  {
+                                                        "runAverage":  {
+                                                                           "median":  97.5315714285714,
+                                                                           "minimum":  97.5315714285714,
+                                                                           "maximum":  97.5315714285714
+                                                                       },
+                                                        "p95":  {
+                                                                    "median":  312.8453,
+                                                                    "minimum":  312.8453,
+                                                                    "maximum":  312.8453
+                                                                },
+                                                        "p99":  {
+                                                                    "median":  391.18482000000006,
+                                                                    "minimum":  391.18482000000006,
+                                                                    "maximum":  391.18482000000006
+                                                                },
+                                                        "maximum":  {
+                                                                        "median":  410.7697,
+                                                                        "minimum":  410.7697,
+                                                                        "maximum":  410.7697
+                                                                    }
+                                                    },
+                                 "ai":  {
+                                            "httpRequests":  31,
+                                            "accepted":  21,
+                                            "rejected":  10,
+                                            "duplicates":  0,
+                                            "uniqueExecutions":  21,
+                                            "completed":  21,
+                                            "webhookSucceeded":  21,
+                                            "webhookFailed":  0,
+                                            "acceptanceRateAgainstBackendRequests":  1,
+                                            "maxObservedInFlight":  2
+                                        },
+                                 "database":  {
+                                                  "waitingForCorrection":  21,
+                                                  "failed":  0,
+                                                  "outboxSent":  21
+                                              }
+                             }
+              },
+    "runs":  [
+                 {
+                     "label":  "retry-baseline-01",
+                     "mode":  "baseline",
+                     "trial":  1,
+                     "backendRequests":  21,
+                     "backendAccepted202":  21,
+                     "backendUnexpected":  0,
+                     "droppedIterations":  0,
+                     "averageMs":  150.66757619047621,
+                     "p95Ms":  421.3161,
+                     "p99Ms":  506.42274,
+                     "maximumMs":  527.6994,
+                     "aiHttpRequests":  21,
+                     "aiAccepted":  4,
+                     "aiRejected":  17,
+                     "aiDuplicates":  0,
+                     "aiUniqueExecutions":  4,
+                     "aiCompleted":  4,
+                     "webhookSucceeded":  4,
+                     "webhookFailed":  0,
+                     "maxObservedInFlight":  2,
+                     "modelWaitingForCorrection":  4,
+                     "modelFailed":  17,
+                     "outboxSent":  0
+                 },
+                 {
+                     "label":  "retry-outbox-01",
+                     "mode":  "outbox",
+                     "trial":  1,
+                     "backendRequests":  21,
+                     "backendAccepted202":  21,
+                     "backendUnexpected":  0,
+                     "droppedIterations":  0,
+                     "averageMs":  97.5315714285714,
+                     "p95Ms":  312.8453,
+                     "p99Ms":  391.18482000000006,
+                     "maximumMs":  410.7697,
+                     "aiHttpRequests":  31,
+                     "aiAccepted":  21,
+                     "aiRejected":  10,
+                     "aiDuplicates":  0,
+                     "aiUniqueExecutions":  21,
+                     "aiCompleted":  21,
+                     "webhookSucceeded":  21,
+                     "webhookFailed":  0,
+                     "maxObservedInFlight":  2,
+                     "modelWaitingForCorrection":  21,
+                     "modelFailed":  0,
+                     "outboxSent":  21
+                 }
+             ]
+}

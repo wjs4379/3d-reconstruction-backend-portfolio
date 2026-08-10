@@ -1,0 +1,62 @@
+﻿[
+    {
+        "label":  "retry-baseline-01",
+        "mode":  "baseline",
+        "trial":  1,
+        "startedAtUtc":  "2026-08-10T04:32:15.3381101Z",
+        "finishedAtUtc":  "2026-08-10T04:32:47.7704766Z",
+        "requestRatePerSecond":  10,
+        "duration":  "2s",
+        "observationSeconds":  30,
+        "roomId":  9,
+        "outboxEnabled":  false,
+        "workerEnabled":  false,
+        "workerBatchSize":  3,
+        "workerMaxConcurrency":  3,
+        "fakeAiMaxInFlight":  2,
+        "fakeAiAcceptDelayMs":  1000,
+        "fakeAiAnalysisDelayMs":  300,
+        "databaseSummary":  [
+                                {
+                                    "kind":  "model",
+                                    "status":  "WAITING_FOR_CORRECTION",
+                                    "count":  4
+                                },
+                                {
+                                    "kind":  "model",
+                                    "status":  "FAILED",
+                                    "count":  17
+                                }
+                            ]
+    },
+    {
+        "label":  "retry-outbox-01",
+        "mode":  "outbox",
+        "trial":  1,
+        "startedAtUtc":  "2026-08-10T04:33:22.4793836Z",
+        "finishedAtUtc":  "2026-08-10T04:33:54.8785897Z",
+        "requestRatePerSecond":  10,
+        "duration":  "2s",
+        "observationSeconds":  30,
+        "roomId":  9,
+        "outboxEnabled":  true,
+        "workerEnabled":  true,
+        "workerBatchSize":  3,
+        "workerMaxConcurrency":  3,
+        "fakeAiMaxInFlight":  2,
+        "fakeAiAcceptDelayMs":  1000,
+        "fakeAiAnalysisDelayMs":  300,
+        "databaseSummary":  [
+                                {
+                                    "kind":  "model",
+                                    "status":  "WAITING_FOR_CORRECTION",
+                                    "count":  21
+                                },
+                                {
+                                    "kind":  "outbox",
+                                    "status":  "SENT",
+                                    "count":  21
+                                }
+                            ]
+    }
+]

@@ -1,0 +1,302 @@
+﻿[
+    {
+        "label":  "repeat-baseline-01",
+        "mode":  "baseline",
+        "trial":  1,
+        "startedAtUtc":  "2026-08-10T04:18:35.0461863Z",
+        "finishedAtUtc":  "2026-08-10T04:19:21.1280920Z",
+        "requestRatePerSecond":  20,
+        "duration":  "5s",
+        "observationSeconds":  40,
+        "roomId":  9,
+        "outboxEnabled":  false,
+        "workerEnabled":  false,
+        "workerBatchSize":  4,
+        "workerMaxConcurrency":  4,
+        "fakeAiMaxInFlight":  4,
+        "fakeAiAcceptDelayMs":  1000,
+        "fakeAiAnalysisDelayMs":  300,
+        "databaseSummary":  [
+                                {
+                                    "kind":  "model",
+                                    "status":  "FAILED",
+                                    "count":  81
+                                },
+                                {
+                                    "kind":  "model",
+                                    "status":  "WAITING_FOR_CORRECTION",
+                                    "count":  20
+                                }
+                            ]
+    },
+    {
+        "label":  "repeat-outbox-01",
+        "mode":  "outbox",
+        "trial":  1,
+        "startedAtUtc":  "2026-08-10T04:19:48.0158888Z",
+        "finishedAtUtc":  "2026-08-10T04:20:33.3702159Z",
+        "requestRatePerSecond":  20,
+        "duration":  "5s",
+        "observationSeconds":  40,
+        "roomId":  9,
+        "outboxEnabled":  true,
+        "workerEnabled":  true,
+        "workerBatchSize":  4,
+        "workerMaxConcurrency":  4,
+        "fakeAiMaxInFlight":  4,
+        "fakeAiAcceptDelayMs":  1000,
+        "fakeAiAnalysisDelayMs":  300,
+        "databaseSummary":  [
+                                {
+                                    "kind":  "model",
+                                    "status":  "WAITING_FOR_CORRECTION",
+                                    "count":  101
+                                },
+                                {
+                                    "kind":  "outbox",
+                                    "status":  "SENT",
+                                    "count":  101
+                                }
+                            ]
+    },
+    {
+        "label":  "repeat-outbox-02",
+        "mode":  "outbox",
+        "trial":  2,
+        "startedAtUtc":  "2026-08-10T04:21:00.1531606Z",
+        "finishedAtUtc":  "2026-08-10T04:21:45.4571388Z",
+        "requestRatePerSecond":  20,
+        "duration":  "5s",
+        "observationSeconds":  40,
+        "roomId":  9,
+        "outboxEnabled":  true,
+        "workerEnabled":  true,
+        "workerBatchSize":  4,
+        "workerMaxConcurrency":  4,
+        "fakeAiMaxInFlight":  4,
+        "fakeAiAcceptDelayMs":  1000,
+        "fakeAiAnalysisDelayMs":  300,
+        "databaseSummary":  [
+                                {
+                                    "kind":  "model",
+                                    "status":  "WAITING_FOR_CORRECTION",
+                                    "count":  100
+                                },
+                                {
+                                    "kind":  "outbox",
+                                    "status":  "SENT",
+                                    "count":  100
+                                }
+                            ]
+    },
+    {
+        "label":  "repeat-baseline-02",
+        "mode":  "baseline",
+        "trial":  2,
+        "startedAtUtc":  "2026-08-10T04:22:12.4519215Z",
+        "finishedAtUtc":  "2026-08-10T04:22:58.7853611Z",
+        "requestRatePerSecond":  20,
+        "duration":  "5s",
+        "observationSeconds":  40,
+        "roomId":  9,
+        "outboxEnabled":  false,
+        "workerEnabled":  false,
+        "workerBatchSize":  4,
+        "workerMaxConcurrency":  4,
+        "fakeAiMaxInFlight":  4,
+        "fakeAiAcceptDelayMs":  1000,
+        "fakeAiAnalysisDelayMs":  300,
+        "databaseSummary":  [
+                                {
+                                    "kind":  "model",
+                                    "status":  "FAILED",
+                                    "count":  80
+                                },
+                                {
+                                    "kind":  "model",
+                                    "status":  "WAITING_FOR_CORRECTION",
+                                    "count":  20
+                                }
+                            ]
+    },
+    {
+        "label":  "repeat-baseline-03",
+        "mode":  "baseline",
+        "trial":  3,
+        "startedAtUtc":  "2026-08-10T04:23:25.7283980Z",
+        "finishedAtUtc":  "2026-08-10T04:24:11.6458039Z",
+        "requestRatePerSecond":  20,
+        "duration":  "5s",
+        "observationSeconds":  40,
+        "roomId":  9,
+        "outboxEnabled":  false,
+        "workerEnabled":  false,
+        "workerBatchSize":  4,
+        "workerMaxConcurrency":  4,
+        "fakeAiMaxInFlight":  4,
+        "fakeAiAcceptDelayMs":  1000,
+        "fakeAiAnalysisDelayMs":  300,
+        "databaseSummary":  [
+                                {
+                                    "kind":  "model",
+                                    "status":  "FAILED",
+                                    "count":  81
+                                },
+                                {
+                                    "kind":  "model",
+                                    "status":  "WAITING_FOR_CORRECTION",
+                                    "count":  20
+                                }
+                            ]
+    },
+    {
+        "label":  "repeat-outbox-03",
+        "mode":  "outbox",
+        "trial":  3,
+        "startedAtUtc":  "2026-08-10T04:24:38.4399175Z",
+        "finishedAtUtc":  "2026-08-10T04:25:23.7991930Z",
+        "requestRatePerSecond":  20,
+        "duration":  "5s",
+        "observationSeconds":  40,
+        "roomId":  9,
+        "outboxEnabled":  true,
+        "workerEnabled":  true,
+        "workerBatchSize":  4,
+        "workerMaxConcurrency":  4,
+        "fakeAiMaxInFlight":  4,
+        "fakeAiAcceptDelayMs":  1000,
+        "fakeAiAnalysisDelayMs":  300,
+        "databaseSummary":  [
+                                {
+                                    "kind":  "model",
+                                    "status":  "WAITING_FOR_CORRECTION",
+                                    "count":  101
+                                },
+                                {
+                                    "kind":  "outbox",
+                                    "status":  "SENT",
+                                    "count":  101
+                                }
+                            ]
+    },
+    {
+        "label":  "repeat-outbox-04",
+        "mode":  "outbox",
+        "trial":  4,
+        "startedAtUtc":  "2026-08-10T04:25:51.1804865Z",
+        "finishedAtUtc":  "2026-08-10T04:26:36.5954612Z",
+        "requestRatePerSecond":  20,
+        "duration":  "5s",
+        "observationSeconds":  40,
+        "roomId":  9,
+        "outboxEnabled":  true,
+        "workerEnabled":  true,
+        "workerBatchSize":  4,
+        "workerMaxConcurrency":  4,
+        "fakeAiMaxInFlight":  4,
+        "fakeAiAcceptDelayMs":  1000,
+        "fakeAiAnalysisDelayMs":  300,
+        "databaseSummary":  [
+                                {
+                                    "kind":  "model",
+                                    "status":  "WAITING_FOR_CORRECTION",
+                                    "count":  101
+                                },
+                                {
+                                    "kind":  "outbox",
+                                    "status":  "SENT",
+                                    "count":  101
+                                }
+                            ]
+    },
+    {
+        "label":  "repeat-baseline-04",
+        "mode":  "baseline",
+        "trial":  4,
+        "startedAtUtc":  "2026-08-10T04:27:04.6524780Z",
+        "finishedAtUtc":  "2026-08-10T04:27:52.4789364Z",
+        "requestRatePerSecond":  20,
+        "duration":  "5s",
+        "observationSeconds":  40,
+        "roomId":  9,
+        "outboxEnabled":  false,
+        "workerEnabled":  false,
+        "workerBatchSize":  4,
+        "workerMaxConcurrency":  4,
+        "fakeAiMaxInFlight":  4,
+        "fakeAiAcceptDelayMs":  1000,
+        "fakeAiAnalysisDelayMs":  300,
+        "databaseSummary":  [
+                                {
+                                    "kind":  "model",
+                                    "status":  "WAITING_FOR_CORRECTION",
+                                    "count":  26
+                                },
+                                {
+                                    "kind":  "model",
+                                    "status":  "FAILED",
+                                    "count":  75
+                                }
+                            ]
+    },
+    {
+        "label":  "repeat-baseline-05",
+        "mode":  "baseline",
+        "trial":  5,
+        "startedAtUtc":  "2026-08-10T04:28:19.5124732Z",
+        "finishedAtUtc":  "2026-08-10T04:29:05.9591550Z",
+        "requestRatePerSecond":  20,
+        "duration":  "5s",
+        "observationSeconds":  40,
+        "roomId":  9,
+        "outboxEnabled":  false,
+        "workerEnabled":  false,
+        "workerBatchSize":  4,
+        "workerMaxConcurrency":  4,
+        "fakeAiMaxInFlight":  4,
+        "fakeAiAcceptDelayMs":  1000,
+        "fakeAiAnalysisDelayMs":  300,
+        "databaseSummary":  [
+                                {
+                                    "kind":  "model",
+                                    "status":  "WAITING_FOR_CORRECTION",
+                                    "count":  20
+                                },
+                                {
+                                    "kind":  "model",
+                                    "status":  "FAILED",
+                                    "count":  81
+                                }
+                            ]
+    },
+    {
+        "label":  "repeat-outbox-05",
+        "mode":  "outbox",
+        "trial":  5,
+        "startedAtUtc":  "2026-08-10T04:29:38.1813046Z",
+        "finishedAtUtc":  "2026-08-10T04:30:23.4970576Z",
+        "requestRatePerSecond":  20,
+        "duration":  "5s",
+        "observationSeconds":  40,
+        "roomId":  9,
+        "outboxEnabled":  true,
+        "workerEnabled":  true,
+        "workerBatchSize":  4,
+        "workerMaxConcurrency":  4,
+        "fakeAiMaxInFlight":  4,
+        "fakeAiAcceptDelayMs":  1000,
+        "fakeAiAnalysisDelayMs":  300,
+        "databaseSummary":  [
+                                {
+                                    "kind":  "model",
+                                    "status":  "WAITING_FOR_CORRECTION",
+                                    "count":  100
+                                },
+                                {
+                                    "kind":  "outbox",
+                                    "status":  "SENT",
+                                    "count":  100
+                                }
+                            ]
+    }
+]

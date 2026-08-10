@@ -1,0 +1,9 @@
+{
+  "scenario": "Simulate AI acceptance followed by loss of the backend SENT update",
+  "httpRequestsBefore": 101,
+  "httpRequestsAfterRetry": 102,
+  "duplicateRequests": 1,
+  "uniqueExecutions": 101,
+  "retriedEventAttemptCount": 2,
+  "retriedEventFinalStatus": "SENT"
+}

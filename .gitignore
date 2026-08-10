@@ -38,6 +38,17 @@ out/
 
 ### Local secrets and JVM crash artifacts ###
 .env
+.env.*
+!.env.example
+*.pem
 *.log
 hs_err_pid*
 replay_pid*
+
+# Local performance-test credentials
+performance/.env.perf.local
+
+# Reproducible raw load-test output (summaries and manifests are committed)
+performance/results/**/*-k6.json
+performance/results/**/*-fake-ai.json
+performance/results/**/*-db.json

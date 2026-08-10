@@ -1,5 +1,8 @@
 package com.hanyang.backend.domain.model3d
 
+import com.hanyang.backend.domain.model3d.outbox.OutboxEvent
+import com.hanyang.backend.domain.model3d.outbox.OutboxEventRepository
+import com.hanyang.backend.domain.model3d.outbox.OutboxEventType
 import com.hanyang.backend.domain.room.AiWebhookRequest
 import com.hanyang.backend.domain.room.RenderStatus
 import com.hanyang.backend.domain.room.RoomRepository
@@ -14,17 +17,22 @@ import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import tools.jackson.databind.json.JsonMapper
 import java.net.URI
+import java.time.LocalDateTime
 import java.util.UUID
 
 @Service
 class Room3DModelService(
     private val roomRepository: RoomRepository,
     private val room3DModelRepository: Room3DModelRepository,
+    private val outboxEventRepository: OutboxEventRepository,
     private val aiServerClient: AiServerClient,
     private val jsonMapper: JsonMapper,
     private val transactionOperations: TransactionOperations,
+    @param:Value("\${outbox.enabled:true}")
+    private val outboxEnabled: Boolean,
     @param:Value("\${app.webhook-url}")
-    private val webhookUrl: String) {
+    private val webhookUrl: String
+) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     /*
@@ -85,11 +93,25 @@ class Room3DModelService(
             userId = toAiUserUuid(ownerId),
             webhookUrl = webhookUrl
         )
-        dispatchAfterCommit(
-            aiRoomId = model.aiRoomId,
-            operation = "analyze"
-        ) {
-            aiServerClient.analyze(aiRequest)
+        if (outboxEnabled) {
+            val now = LocalDateTime.now()
+            outboxEventRepository.save(
+                OutboxEvent(
+                    eventType = OutboxEventType.AI_ANALYZE,
+                    aggregateId = model.aiRoomId,
+                    payload = jsonMapper.writeValueAsString(aiRequest),
+                    nextAttemptAt = now,
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
+        } else {
+            dispatchAfterCommit(
+                aiRoomId = model.aiRoomId,
+                operation = "analyze"
+            ) {
+                aiServerClient.analyze(aiRequest)
+            }
         }
 
         return model.toStatusResponse()

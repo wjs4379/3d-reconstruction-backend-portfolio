@@ -20,3 +20,9 @@ app:
   webhook-url: http://localhost:8080/api/webhook
   jwt:
     secret: test-only-jwt-secret-with-at-least-32-bytes
+
+outbox:
+  enabled: true
+  worker:
+    # 테스트가 processOnce()를 직접 호출하기 전에 백그라운드 Worker가 가져가지 않게 합니다.
+    enabled: false

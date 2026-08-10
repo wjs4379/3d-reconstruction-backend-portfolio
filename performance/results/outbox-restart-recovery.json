@@ -1,0 +1,15 @@
+{
+  "scenario": "Persist work with the Worker disabled, terminate the JVM, then restart with the Worker enabled",
+  "beforeRestart": {
+    "pendingOutboxEvents": 11,
+    "fakeAiRequests": 0
+  },
+  "afterRestart": {
+    "sentOutboxEvents": 11,
+    "fakeAiAcceptedRequests": 11,
+    "fakeAiRejectedRequests": 0,
+    "webhookSucceeded": 11,
+    "maxObservedInFlight": 4,
+    "modelsWaitingForCorrection": 11
+  }
+}

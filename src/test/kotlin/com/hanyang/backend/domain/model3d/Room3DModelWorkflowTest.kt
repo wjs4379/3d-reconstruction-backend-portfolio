@@ -1,5 +1,6 @@
 package com.hanyang.backend.domain.model3d
 
+import com.hanyang.backend.domain.model3d.outbox.OutboxEventRepository
 import com.hanyang.backend.domain.property.Property
 import com.hanyang.backend.domain.room.AiWebhookRequest
 import com.hanyang.backend.domain.room.RenderStatus
@@ -22,6 +23,7 @@ class Room3DModelWorkflowTest {
 
     private lateinit var roomRepository: RoomRepository
     private lateinit var modelRepository: Room3DModelRepository
+    private lateinit var outboxEventRepository: OutboxEventRepository
     private lateinit var aiClient: RecordingAiServerClient
     private lateinit var service: Room3DModelService
 
@@ -29,13 +31,16 @@ class Room3DModelWorkflowTest {
     fun setUp() {
         roomRepository = Mockito.mock(RoomRepository::class.java)
         modelRepository = Mockito.mock(Room3DModelRepository::class.java)
+        outboxEventRepository = Mockito.mock(OutboxEventRepository::class.java)
         aiClient = RecordingAiServerClient()
         service = Room3DModelService(
             roomRepository = roomRepository,
             room3DModelRepository = modelRepository,
+            outboxEventRepository = outboxEventRepository,
             aiServerClient = aiClient,
             jsonMapper = JsonMapper.builder().build(),
             transactionOperations = TransactionOperations.withoutTransaction(),
+            outboxEnabled = false,
             webhookUrl = "http://localhost:8080/api/webhook"
         )
     }

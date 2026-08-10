@@ -1,0 +1,14 @@
+{
+  "outboxEvents": 21,
+  "finalStatus": "SENT",
+  "attemptDistribution": [
+    {
+      "attemptCount": 1,
+      "eventCount": 11
+    },
+    {
+      "attemptCount": 2,
+      "eventCount": 10
+    }
+  ]
+}

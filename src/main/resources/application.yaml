@@ -29,3 +29,16 @@ app:
   webhook-url: ${APP_WEBHOOK_URL:http://localhost:8080/api/webhook}
   jwt:
     secret: ${JWT_SECRET}
+
+outbox:
+  # false로 실행하면 기존 afterCommit + subscribe 기준선을 재현합니다.
+  enabled: ${OUTBOX_ENABLED:true}
+  worker:
+    enabled: ${OUTBOX_WORKER_ENABLED:true}
+    fixed-delay-ms: ${OUTBOX_FIXED_DELAY_MS:500}
+    batch-size: ${OUTBOX_BATCH_SIZE:4}
+    max-concurrency: ${OUTBOX_MAX_CONCURRENCY:4}
+    lease-ms: ${OUTBOX_LEASE_MS:30000}
+    request-timeout-ms: ${OUTBOX_REQUEST_TIMEOUT_MS:10000}
+    max-attempts: ${OUTBOX_MAX_ATTEMPTS:5}
+    base-backoff-ms: ${OUTBOX_BASE_BACKOFF_MS:1000}

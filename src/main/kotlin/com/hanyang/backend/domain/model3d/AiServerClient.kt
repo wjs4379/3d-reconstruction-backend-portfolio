@@ -19,8 +19,20 @@ class AiServerClient(
 
     /** 1차 이미지 분석을 요청합니다. */
     fun analyze(request: AiAnalyzeRequestDto): Mono<Void> {
+        return analyze(request, null)
+    }
+
+    fun analyze(
+        request: AiAnalyzeRequestDto,
+        idempotencyKey: String?
+    ): Mono<Void> {
         return webClient.post()
             .uri("/api/v1/rooms/analyze")
+            .headers { headers ->
+                idempotencyKey
+                    ?.takeIf(String::isNotBlank)
+                    ?.let { headers.set("Idempotency-Key", it) }
+            }
             .bodyValue(request)
             .retrieve()
             .bodyToMono(Void::class.java)
