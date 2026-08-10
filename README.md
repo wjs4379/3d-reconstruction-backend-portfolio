@@ -32,8 +32,8 @@ AI의 이미지 분석과 좌표 재구성은 처리 시간이 길고, 분석 �
 flowchart LR
     FE["Frontend App"]
     S3["AWS S3"]
-    subgraph APP["Spring Boot Backend"]
-        BE["API · 상태 관리"]
+    subgraph APP["Backend Application"]
+        BE["Spring Boot Backend<br/>API · 상태 관리"]
         WORKER["Outbox Worker"]
     end
     DB[("MySQL<br/>Room3DModel · OutboxEvent")]
@@ -58,7 +58,7 @@ sequenceDiagram
     autonumber
     participant FE as Frontend
     participant S3 as AWS S3
-    participant BE as Spring Boot
+    participant BE as Spring Boot Backend
     participant DB as MySQL
     participant WORKER as Outbox Worker
     participant AI as FastAPI AI
