@@ -33,7 +33,8 @@ flowchart LR
     FE["Frontend App"]
     S3["AWS S3"]
     subgraph APP["Backend Application"]
-        BE["Spring Boot Backend<br/>API · 상태 관리"]
+        BE["Spring Boot Backend<br/>
+API · 상태 관리"]
         WORKER["Outbox Worker"]
     end
     DB[("MySQL<br/>Room3DModel · OutboxEvent")]
