@@ -1,6 +1,9 @@
 package com.hanyang.backend.domain.model3d.outbox
 
 import com.hanyang.backend.domain.model3d.AiAnalyzeRequestDto
+import com.hanyang.backend.domain.model3d.AiCorrectionReconstructRequestDto
+import com.hanyang.backend.domain.model3d.CorrectionRequestDto
+import com.hanyang.backend.domain.model3d.VertexDto
 import com.hanyang.backend.domain.model3d.AiServerClient
 import com.hanyang.backend.domain.model3d.ModelStatus
 import com.hanyang.backend.domain.model3d.Room3DModelRepository
@@ -155,6 +158,27 @@ class OutboxDispatchServiceTest {
         )
     }
 
+    @Test
+    fun `correction command replays both steps unchanged after an ambiguous HTTP acknowledgement`() {
+        val fixture=fixture()
+        val request=AiCorrectionReconstructRequestDto("ai-room-1",CorrectionRequestDto(listOf(VertexDto("v",1.0,2.0,0.0)),emptyList()))
+        val claimed=claim(1).copy(eventType=OutboxEventType.AI_CORRECTION_RECONSTRUCT,payload=jsonMapper.writeValueAsString(request))
+        Mockito.`when`(fixture.aiServerClient.sendCorrection(request.aiRoomId,request.correction,"${claimed.idempotencyKey}:correction")).thenReturn(Mono.empty())
+        Mockito.`when`(fixture.aiServerClient.reconstruct(request.aiRoomId,"${claimed.idempotencyKey}:reconstruct"))
+            .thenReturn(Mono.error(TimeoutException("lost HTTP ACK")),Mono.empty())
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException::class.java) { fixture.service.send(claimed).block() }
+        fixture.service.send(claimed.copy(attemptCount=2,lockToken="replacement-worker")).block()
+        Mockito.verify(fixture.aiServerClient,Mockito.times(2)).sendCorrection(request.aiRoomId,request.correction,"${claimed.idempotencyKey}:correction")
+        Mockito.verify(fixture.aiServerClient,Mockito.times(2)).reconstruct(request.aiRoomId,"${claimed.idempotencyKey}:reconstruct")
+    }
+    @Test
+    fun `permanent correction delivery failure affects only reconstructing models`() {
+        val fixture=fixture();val claimed=claim(5).copy(eventType=OutboxEventType.AI_CORRECTION_RECONSTRUCT)
+        Mockito.`when`(fixture.outboxRepository.markDeadIfOwned(claimed.id,claimed.lockToken,OutboxStatus.PROCESSING,OutboxStatus.DEAD,"TimeoutException: unavailable",now)).thenReturn(1)
+        assertEquals(DispatchFailureOutcome.DEAD,fixture.service.markFailure(claimed,TimeoutException("unavailable")))
+        val error=jsonMapper.writeValueAsString(mapOf("code" to "AI_REQUEST_FAILED","operation" to "correction-and-reconstruct","message" to "TimeoutException: unavailable"))
+        Mockito.verify(fixture.modelRepository).markFailedIfCurrentStatus(claimed.aggregateId,ModelStatus.RECONSTRUCTING,ModelStatus.FAILED,error)
+    }
     private fun fixture(): Fixture {
         val outboxRepository = Mockito.mock(OutboxEventRepository::class.java)
         val modelRepository = Mockito.mock(Room3DModelRepository::class.java)

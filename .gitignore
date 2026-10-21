@@ -52,3 +52,35 @@ performance/.env.perf.local
 performance/results/**/*-k6.json
 performance/results/**/*-fake-ai.json
 performance/results/**/*-db.json
+
+# Local V1 media files
+.local-media/
+
+# Database/media backups and local TLS private material
+/backups/
+/deploy/tls/
+.DS_Store
+
+# Kotlin compiler local cache
+.kotlin/
+
+# AWS runtime configuration (the example stays tracked)
+deploy/*.env
+aws.env
+
+# Python local DB/backup tooling caches
+__pycache__/
+*.py[cod]
+
+# Operator runtimes, generated credentials and data backups are never source.
+/.runtime/
+/.aws/
+**/ai_ed25519
+**/real-integration.env
+**/local-secrets.json
+**/backups/
+*.sqlite
+*.sqlite3
+*.db
+*.sql.gz
+*.tar.gz

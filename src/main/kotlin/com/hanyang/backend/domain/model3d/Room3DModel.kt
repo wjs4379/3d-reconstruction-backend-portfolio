@@ -8,6 +8,8 @@ import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.UUID
 
+enum class ModelSourceType { LEGACY_AI, AI_PIPELINE, MANUAL_UPLOAD }
+
 // 상태 관리를 위한 Enum 추가
 enum class ModelStatus {
     ANALYZING,               // Phase 1: 이미지 분석 중
@@ -33,8 +35,16 @@ class Room3DModel(
     var aiRoomId: String = UUID.randomUUID().toString(),
 
     // 일단 대표 이미지 URL 하나 저장. 여러 장은 roomData나 별도 필드로 확장 가능
-    @Column(name = "original_image_url", nullable = false, columnDefinition = "TEXT")
-    var originalImageUrl: String="",
+    @Column(name = "original_image_url", columnDefinition = "TEXT")
+    var originalImageUrl: String? = null,
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "source_type", nullable = false, length = 20)
+    var sourceType: ModelSourceType = ModelSourceType.LEGACY_AI,
+
+    @Column(name = "source_image_asset_ids", columnDefinition = "LONGTEXT")
+    var sourceImageAssetIds: String? = null,
 
     //s3링크
     @Column(name = "model_url", nullable = true, columnDefinition = "TEXT")

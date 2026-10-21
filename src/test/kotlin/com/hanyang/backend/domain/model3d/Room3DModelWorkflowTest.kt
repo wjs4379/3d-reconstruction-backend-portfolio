@@ -51,7 +51,8 @@ class Room3DModelWorkflowTest {
         val imageUrls = listOf(
             "https://example.com/room-1.jpg",
             "https://example.com/room-2.jpg",
-            "https://example.com/room-3.jpg"
+            "https://example.com/room-3.jpg",
+            "https://example.com/room-4.jpg"
         )
 
         Mockito.`when`(roomRepository.findById(1L))

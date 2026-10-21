@@ -1,0 +1,13 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "WritePrivateDatabaseBackups",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::REPLACE_MEDIA_BUCKET/backups/estate/*"
+    }
+  ]
+}

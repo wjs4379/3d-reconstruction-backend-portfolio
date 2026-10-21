@@ -18,7 +18,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping -h 127.0.0.1 -uroot --silent"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -43,14 +43,36 @@ services:
       DB_URL: ${DB_URL:?Set DB_URL in .env}
       DB_USERNAME: ${DB_USERNAME:?Set DB_USERNAME in .env}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
-      AI_SERVER_BASE_URL: ${AI_SERVER_BASE_URL:?Set AI_SERVER_BASE_URL in .env}
-      APP_WEBHOOK_URL: ${APP_WEBHOOK_URL:?Set APP_WEBHOOK_URL in .env}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_ISSUER: ${JWT_ISSUER:-gp-backend}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      KAKAO_APP_ID: ${KAKAO_APP_ID:-}
+      KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY:-}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
+      KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      APP_PUBLIC_BASE_URL: ${APP_PUBLIC_BASE_URL:-http://localhost:8080}
+      MEDIA_MODE: ${MEDIA_MODE:-local}
+      MEDIA_LOCAL_DIRECTORY: /app/media
+      APPROVED_LEGACY_MODEL_IDS: ${APPROVED_LEGACY_MODEL_IDS:-}
+      MEDIA_S3_BUCKET: ${MEDIA_S3_BUCKET:-}
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      AI_SERVER_BASE_URL: ${AI_SERVER_BASE_URL:-http://127.0.0.1:8000}
+      APP_WEBHOOK_URL: ${APP_WEBHOOK_URL:-http://app:8080/api/internal/ai/webhook}
+      KAKAO_LOCAL_REST_API_KEY: ${KAKAO_LOCAL_REST_API_KEY:-}
+      AI_PIPELINE_ENABLED: ${AI_PIPELINE_ENABLED:-false}
+      AI_SERVICE_KEY: ${AI_SERVICE_KEY:-}
+      APP_BACKEND_BASE_URL: ${APP_BACKEND_BASE_URL:-http://app:8080}
+      # Review old pending events before enabling analysis dispatch.
+      OUTBOX_WORKER_ENABLED: ${OUTBOX_WORKER_ENABLED:-false}
+      SERVER_FORWARD_HEADERS_STRATEGY: native
       JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError
     ports:
-      - "127.0.0.1:8080:8080"
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_HOST_PORT:-8080}:8080"
+    volumes:
+      - media_data:/app/media
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/api/test/hello"]
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/actuator/health/readiness"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -65,5 +87,24 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # An explicit operator command only; normal startup never baselines an existing DB.
+  flyway:
+    image: redgate/flyway:11.14.1
+    platform: linux/amd64
+    profiles: ["tools"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      FLYWAY_URL: ${DB_URL:?Set DB_URL in .env}
+      FLYWAY_USER: ${DB_USERNAME:?Set DB_USERNAME in .env}
+      FLYWAY_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      FLYWAY_BASELINE_ON_MIGRATE: "false"
+      FLYWAY_CLEAN_DISABLED: "true"
+    volumes:
+      - ./src/main/resources/db/migration:/flyway/sql:ro
+    command: ["info"]
+
 volumes:
   mysql_data:
+  media_data:

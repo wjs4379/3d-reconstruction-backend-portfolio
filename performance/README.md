@@ -1,3 +1,5 @@
+> **과거 버전의 성능 실험 기록**: 아래 측정은 초기 방 API와 최초 분석 Outbox를 비교한 Fake AI 제어 실험이다. 현재 V2의 실행 방법·성능 수치가 아니다. 당시 공개 코드 스냅샷 `fcdb06b`와 함께 읽으며 원래 수치·실험 파일은 유지한다. 현재 실행·API는 [프로젝트 README](../README.md)와 [V2 계약](../docs/frontend-api-contract.md)을 따른다.
+
 # AI 분석 요청 Outbox 성능·안정성 실험
 
 이 디렉터리는 기존 `afterCommit + subscribe()` 방식과 MySQL Transactional Outbox 방식을 **동일한 조건**에서 비교하기 위한 로컬 실험 도구입니다.

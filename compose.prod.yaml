@@ -1,0 +1,53 @@
+# Use with compose.yaml after provisioning a domain and trusted TLS certificate.
+services:
+  app:
+    environment:
+      KAKAO_REDIRECT_URI: https://${API_DOMAIN:?Set the real application domain}/oauth/callback/kakao
+  web:
+    build:
+      context: ../FrontEnd
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+        VITE_KAKAO_REST_API_KEY: ${VITE_KAKAO_REST_API_KEY:-}
+        VITE_KAKAO_REDIRECT_URI: https://${API_DOMAIN:?Set the real application domain}/oauth/callback/kakao
+        VITE_MAP_TILE_URL: ${VITE_MAP_TILE_URL:-}
+        VITE_MAP_TILE_ATTRIBUTION: ${VITE_MAP_TILE_ATTRIBUTION:-&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors}
+    image: metaround-web:local
+    restart: unless-stopped
+    # Non-root static server; nginx writes temporary files only under /tmp.
+    entrypoint: ["nginx"]
+    command: ["-g", "daemon off;"]
+    read_only: true
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+  nginx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?Set the real API domain}
+      NGINX_ENVSUBST_FILTER: '^API_DOMAIN$'
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ${TLS_DIRECTORY:?Set the directory containing fullchain.pem and privkey.pem}:/etc/nginx/tls:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

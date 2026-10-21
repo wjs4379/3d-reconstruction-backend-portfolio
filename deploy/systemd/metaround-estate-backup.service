@@ -1,0 +1,28 @@
+[Unit]
+Description=Private versioned backup of Metaround estate schema
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+WorkingDirectory=/opt/metaround/current/BackEnd
+ExecStart=/usr/bin/python3 /opt/metaround/current/BackEnd/deploy/backup-estate.py --env-file /etc/metaround/aws-cloudfront-local.preview.env --backup-root /var/lib/metaround-estate-backups
+StateDirectory=metaround-estate-backups
+StateDirectoryMode=0700
+TimeoutStartSec=30min
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadOnlyPaths=/etc/metaround
+ReadWritePaths=/var/lib/metaround-estate-backups
+# The helper reads literal dotenv itself; never use EnvironmentFile or shell -x.
+# Runtime IAM permits backup-prefix PutObject only. Restore is an admin operation.
+# Change the env-file explicitly when switching from preview to configured OAuth.
+# This job supports only metaround_estate_v5 in the existing same-host MySQL.
+StandardOutput=journal
+StandardError=journal

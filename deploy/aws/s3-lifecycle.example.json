@@ -1,0 +1,20 @@
+{
+  "Rules": [
+    {
+      "ID": "Expire-only-temporary-uploads",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "staging/"
+      },
+      "Expiration": {
+        "Days": 7
+      },
+      "NoncurrentVersionExpiration": {
+        "NoncurrentDays": 7
+      },
+      "AbortIncompleteMultipartUpload": {
+        "DaysAfterInitiation": 1
+      }
+    }
+  ]
+}

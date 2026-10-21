@@ -26,9 +26,12 @@ RUN apt-get update && \
     useradd --system --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app
 
 WORKDIR /app
+RUN mkdir -p /app/media && chown app:app /app/media
 COPY --from=builder --chown=app:app /workspace/app.jar /app/app.jar
 
 USER app
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
+    CMD curl --fail --silent http://127.0.0.1:8080/actuator/health/readiness || exit 1
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

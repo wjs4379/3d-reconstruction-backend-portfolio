@@ -16,9 +16,9 @@ concurrency:
 
 jobs:
   test:
-    name: Gradle test
+    name: Test and package estate app
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout source
@@ -36,8 +36,42 @@ jobs:
       - name: Grant execute permission for Gradle wrapper
         run: chmod +x gradlew
 
-      - name: Run tests
-        run: ./gradlew test --no-daemon --stacktrace
+      - name: Require Docker for MySQL migration tests
+        run: docker info > /dev/null
+
+      - name: Verify AWS deployment safeguards without external resources
+        run: python3 -B -m unittest discover -s deploy/tests -p 'test_*.py' -v
+
+      - name: Verify local backup and process ownership safeguards
+        run: python3 -B -m unittest discover -s scripts/tests -p 'test_*.py' -v
+
+      - name: Run tests and build executable JAR
+        run: ./gradlew check bootJar --no-daemon --stacktrace
+
+      - name: Require executed MySQL migration tests
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          reports = list(Path("build/test-results/test").glob("TEST-*MySqlMigrationIntegrationTest.xml"))
+          if len(reports) != 1:
+              raise SystemExit("Missing MySQL migration test report")
+          suite = ET.parse(reports[0]).getroot()
+          if int(suite.get("tests", "0")) < 7 or any(int(suite.get(k, "0")) != 0 for k in ("skipped", "failures", "errors")):
+              raise SystemExit("MySQL migration tests must execute and pass without skips")
+          print("MySQL migration tests executed without skips")
+          PY
+
+      - name: Validate deployment configuration without loading secrets
+        run: |
+          docker compose --env-file .env.example -f compose.yaml -f compose.prod.yaml config --quiet
+          docker compose --env-file deploy/aws.env.example -f compose.aws.yaml config --quiet
+          docker compose --env-file deploy/aws-cloudfront.env.example -f compose.aws-cloudfront.yaml config --quiet
+          docker compose --env-file deploy/aws-cloudfront-local.env.example -f compose.aws-cloudfront-local.yaml config --quiet
+          docker compose --env-file deploy/aws-cloudfront-local.preview.env.example -f compose.aws-cloudfront-local.yaml config --quiet
+
+      - name: Build runtime container
+        run: docker build --tag gp-backend:ci .
 
       - name: Upload test reports on failure
         if: failure()

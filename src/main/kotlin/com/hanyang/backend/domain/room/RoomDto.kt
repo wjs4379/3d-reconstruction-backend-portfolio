@@ -39,14 +39,17 @@ data class RoomCreateResponse(
     val propertyId: Long,
     val ownerId: Long,
     val roomName: String,
-    val pricePerNight: Int,
-    val maxGuests: Int
+    val pricePerNight: Int?,
+    val maxGuests: Int?
 )
 
 
 // AI 서버가 백엔드로 전달하는 분석·재구성 결과
+enum class AiWebhookPhase { ANALYZE, RECONSTRUCT }
+
 data class AiWebhookRequest(
     val aiRoomId: String,
     val status: RenderStatus,
-    val roomDataJson: String?
+    val roomDataJson: String?,
+    val phase: AiWebhookPhase? = null
 )

@@ -1,6 +1,7 @@
 package com.hanyang.backend.domain.model3d.outbox
 
 import com.hanyang.backend.domain.model3d.AiAnalyzeRequestDto
+import com.hanyang.backend.domain.model3d.AiCorrectionReconstructRequestDto
 import com.hanyang.backend.domain.model3d.AiServerClient
 import com.hanyang.backend.domain.model3d.ModelStatus
 import com.hanyang.backend.domain.model3d.Room3DModelRepository
@@ -27,7 +28,8 @@ data class ClaimedOutboxEvent(
     val aggregateId: String,
     val payload: String,
     val attemptCount: Int,
-    val lockToken: String
+    val lockToken: String,
+    val eventType: OutboxEventType = OutboxEventType.AI_ANALYZE
 )
 
 enum class DispatchFailureOutcome {
@@ -86,7 +88,8 @@ class OutboxDispatchService(
                 aggregateId = event.aggregateId,
                 payload = event.payload,
                 attemptCount = event.attemptCount,
-                lockToken = token
+                lockToken = token,
+                eventType = event.eventType
             )
         }
     }
@@ -94,11 +97,19 @@ class OutboxDispatchService(
     /** AI HTTP 호출은 DB 트랜잭션 밖에서 실행됩니다. */
     fun send(claimed: ClaimedOutboxEvent): Mono<Void> {
         return Mono.defer {
-            val request = jsonMapper.readValue(
-                claimed.payload,
-                AiAnalyzeRequestDto::class.java
-            )
-            aiServerClient.analyze(request, claimed.idempotencyKey)
+            when (claimed.eventType) {
+                OutboxEventType.AI_ANALYZE -> {
+                    val request = jsonMapper.readValue(claimed.payload, AiAnalyzeRequestDto::class.java)
+                    require(request.roomId == claimed.aggregateId) { "Outbox aggregate does not match analysis room" }
+                    aiServerClient.analyze(request, claimed.idempotencyKey)
+                }
+                OutboxEventType.AI_CORRECTION_RECONSTRUCT -> {
+                    val request = jsonMapper.readValue(claimed.payload, AiCorrectionReconstructRequestDto::class.java)
+                    require(request.aiRoomId == claimed.aggregateId) { "Outbox aggregate does not match correction room" }
+                    aiServerClient.sendCorrection(request.aiRoomId, request.correction, "${claimed.idempotencyKey}:correction")
+                        .then(Mono.defer { aiServerClient.reconstruct(request.aiRoomId, "${claimed.idempotencyKey}:reconstruct") })
+                }
+            }
         }.timeout(Duration.ofMillis(requestTimeoutMs))
     }
 
@@ -154,21 +165,23 @@ class OutboxDispatchService(
             return DispatchFailureOutcome.IGNORED_STALE_RESULT
         }
 
+        val operation = if (claimed.eventType == OutboxEventType.AI_ANALYZE) "analyze" else "correction-and-reconstruct"
+        val expectedStatus = if (claimed.eventType == OutboxEventType.AI_ANALYZE) ModelStatus.ANALYZING else ModelStatus.RECONSTRUCTING
         val errorRoomData = runCatching {
             jsonMapper.writeValueAsString(
                 mapOf(
                     "code" to "AI_REQUEST_FAILED",
-                    "operation" to "analyze",
+                    "operation" to operation,
                     "message" to lastError
                 )
             )
         }.getOrElse {
-            "{\"code\":\"AI_REQUEST_FAILED\",\"operation\":\"analyze\"}"
+            "{\"code\":\"AI_REQUEST_FAILED\",\"operation\":\"$operation\"}"
         }
 
         room3DModelRepository.markFailedIfCurrentStatus(
             aiRoomId = claimed.aggregateId,
-            expectedStatus = ModelStatus.ANALYZING,
+            expectedStatus = expectedStatus,
             failedStatus = ModelStatus.FAILED,
             errorRoomData = errorRoomData
         )

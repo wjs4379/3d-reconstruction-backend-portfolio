@@ -8,14 +8,19 @@ spring:
     # MySQL 드라이버 클래스 지정
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
   jpa:
+    open-in-view: false
     hibernate:
-      # 엔티티 클래스 변경 시 DB 테이블을 자동으로 업데이트 (개발 단계 추천)
-      ddl-auto: update
+      # 스키마 변경은 Flyway 이력으로 적용하고 엔티티와 일치하는지 검사
+      ddl-auto: validate
     properties:
       hibernate:
         # 실행되는 SQL 쿼리를 콘솔창에 출력
-        show_sql: true
+        default_batch_fetch_size: 50
+        show_sql: false
         # 콘솔에 출력되는 SQL을 읽기 좋게 포맷팅
         format_sql: true
         # 엔티티의 camelCase 필드명을 DB의 snake_case 컬럼명으로 자동 변환
@@ -26,15 +31,42 @@ ai:
     base-url: ${AI_SERVER_BASE_URL:http://localhost:8000}
 
 app:
-  webhook-url: ${APP_WEBHOOK_URL:http://localhost:8080/api/webhook}
+  location:
+    kakao-rest-api-key: ${KAKAO_LOCAL_REST_API_KEY:}
+  ai:
+    pipeline-enabled: ${AI_PIPELINE_ENABLED:false}
+    service-key: ${AI_SERVICE_KEY:}
+    backend-base-url: ${APP_BACKEND_BASE_URL:}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  oauth:
+    google:
+      client-id: ${GOOGLE_CLIENT_ID:}
+    kakao:
+      app-id: ${KAKAO_APP_ID:}
+      rest-api-key: ${KAKAO_REST_API_KEY:}
+      client-secret: ${KAKAO_CLIENT_SECRET:}
+      redirect-uri: ${KAKAO_REDIRECT_URI:}
+  media:
+    mode: ${MEDIA_MODE:local}
+    local-directory: ${MEDIA_LOCAL_DIRECTORY:./.local-media}
+    public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
+    s3-bucket: ${MEDIA_S3_BUCKET:}
+    s3-region: ${AWS_REGION:ap-northeast-2}
+    max-image-bytes: 5242880
+    max-model-bytes: 26214400
+    upload-minutes: 10
+    approved-legacy-model-ids: ${APPROVED_LEGACY_MODEL_IDS:}
   jwt:
+    issuer: ${JWT_ISSUER:gp-backend}
     secret: ${JWT_SECRET}
+  webhook-url: ${APP_WEBHOOK_URL:http://localhost:8080/api/webhook}
 
 outbox:
   # false로 실행하면 기존 afterCommit + subscribe 기준선을 재현합니다.
   enabled: ${OUTBOX_ENABLED:true}
   worker:
-    enabled: ${OUTBOX_WORKER_ENABLED:true}
+    enabled: ${OUTBOX_WORKER_ENABLED:false}
     fixed-delay-ms: ${OUTBOX_FIXED_DELAY_MS:500}
     batch-size: ${OUTBOX_BATCH_SIZE:4}
     max-concurrency: ${OUTBOX_MAX_CONCURRENCY:4}
@@ -42,3 +74,19 @@ outbox:
     request-timeout-ms: ${OUTBOX_REQUEST_TIMEOUT_MS:10000}
     max-attempts: ${OUTBOX_MAX_ATTEMPTS:5}
     base-backoff-ms: ${OUTBOX_BASE_BACKOFF_MS:1000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+  health:
+    redis:
+      enabled: false

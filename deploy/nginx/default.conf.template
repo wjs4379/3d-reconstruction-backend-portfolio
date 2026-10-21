@@ -1,0 +1,48 @@
+# Expanded by the official nginx image; only API_DOMAIN is substituted.
+log_format gp_api '$remote_addr [$time_local] "$request_method $uri $server_protocol" $request_id $status $body_bytes_sent $request_time';
+access_log /var/log/nginx/access.log gp_api;
+
+server {
+    listen 80;
+    server_name ${API_DOMAIN};
+    return 308 https://${API_DOMAIN}$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${API_DOMAIN};
+    ssl_certificate /etc/nginx/tls/fullchain.pem;
+    ssl_certificate_key /etc/nginx/tls/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    add_header X-Request-ID $request_id always;
+    add_header Strict-Transport-Security "max-age=86400" always;
+
+    server_tokens off;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header X-Frame-Options SAMEORIGIN always;
+    client_max_body_size 26m;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 30s;
+    proxy_send_timeout 30s;
+
+    # Actuator is an internal operational endpoint, not a public SPA route.
+    location ^~ /actuator/ { return 404; }
+
+    # GPU service reaches the app through its private origin, not this public listener.
+    location ^~ /api/internal/ai/ { return 404; }
+
+    location /api/ {
+        proxy_pass http://app:8080;
+        proxy_set_header X-Request-ID $request_id;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+    location / {
+        proxy_pass http://web:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}

@@ -1,207 +1,100 @@
-# Frontend–Backend 3D API Contract
+# V2 API 계약: 사진 4장부터 매물의 3D 결과까지
 
-이 문서는 방 생성부터 AI 분석, 사용자 보정, 최종 좌표 기반 모델 파일 등록까지 프론트엔드가 사용하는 단일 API 계약입니다.
+공개 코드의 현재 계약이다. 오래된 /api/rooms/**·/api/webhook·임의 S3 URL 결과 등록은 이전 계약이며 현재 일반 업무 경로로 사용하지 않는다. v2는 사용자 API 계약 버전이고 별도 AI의 /api/v1과 번호를 맞추는 의미가 아니다. 예시 ID는 설명용이다.
 
-> 프론트엔드는 `POST /api/webhook`을 호출하지 않습니다. 이 경로는 AI 서버의 좌표 결과 수신 전용입니다. 최종 `modelUrl`은 반드시 `PUT /api/rooms/{roomId}/models/{modelId}/result`로 등록합니다.
+## 인증과 공간
 
-## 처리 순서
+보호 API에는 Authorization: Bearer 토큰이 필요하다. 실제 Kakao 인가 코드는 POST /api/auth/kakao/code의 {"code":"..."}로 교환하고 GET /api/auth/me로 사용자와 권한을 확인한다. 앱 ID·REST 식별자·서버 Client Secret·등록 callback은 같은 앱 설정이어야 한다. 미설정 제공자는 503이며 production에 테스트 로그인은 없다.
 
-```text
-방 생성
-→ 여러 이미지 분석 요청
-→ 상태 Polling
-→ WAITING_FOR_CORRECTION에서 좌표 편집
-→ 보정 좌표와 함께 재구성 요청
-→ 상태 Polling
-→ WAITING_FOR_MODEL_UPLOAD에서 최종 좌표로 모델 생성
-→ 최종 모델 파일을 영속 저장소에 업로드
-→ modelUrl과 파일 메타데이터 등록
-→ SUCCESS에서 modelUrl 표시
+| Method | 경로 | 역할 |
+|---|---|---|
+| POST / GET | /api/v2/properties | 건물 생성·내 목록 |
+| POST | /api/v2/units | 호실 생성 |
+| GET | /api/v2/me/units | 내 호실 |
+| POST / GET | /api/v2/units/{unitId}/spaces | 호실 안의 공간 생성·목록 |
+| POST | /api/v2/locations/resolve | 서버 주소·좌표 확인 |
+
+사용자 ID를 요청에서 임의 지정해 권한을 바꾸지 않는다. 소유자·호실·공간·자산 귀속은 서버에서 확인한다.
+
+## 사진 업로드
+
+POST /api/v2/media/upload-sessions
+
+```json
+{"unitId":10,"kind":"IMAGE","contentType":"image/jpeg","sizeBytes":120000}
 ```
 
-## 1. 방 생성
+1. 응답의 id/uploadUrl/method/headers/expiresAt을 사용한다. S3 URL을 직접 조립하지 않는다.
+2. 지정 URL에 파일을 전송한다. local 모드는 PUT /api/v2/media/upload-sessions/{id}/content, S3 모드는 응답의 임시 URL을 사용한다.
+3. POST /api/v2/media/upload-sessions/{id}/complete로 내용 검증 후 MediaAssetView.id를 받는다.
+4. 서로 다른 사진 네 장에 대해 반복한다. session ID와 완료 asset ID는 다르다.
 
-```http
-POST /api/rooms
-Content-Type: application/json
+서버는 checksum·이미지 표시 크기·EXIF 방향·소유권을 확인한다. 같은 사진을 반복한 분석, 형식·크기 불일치와 다른 호실 자산은 거절한다. 세부 필드는 [MediaDto](../src/main/kotlin/com/hanyang/backend/domain/media/MediaDto.kt)를 본다.
+
+## 분석·상태·보정·재구성
+
+| Method | 경로 | 요청/반환 |
+|---|---|---|
+| POST | /api/v2/spaces/{spaceId}/models/analyze | imageAssetIds 정확히 네 개 → ManagedModelView |
+| GET | /api/v2/spaces/{spaceId}/models | 작업 목록 |
+| GET | /api/v2/spaces/{spaceId}/models/{modelId} | 지정 작업 상태·좌표·자산 |
+| POST | /api/v2/spaces/{spaceId}/models/{modelId}/reconstruct | 보정 vertices/edges → 재구성 접수 |
+| POST | /api/v2/spaces/{spaceId}/models/{modelId}/refresh | AI 상태 재조회로 callback 유실 복구 |
+
+```json
+{"imageAssetIds":[41,42,43,44]}
 ```
+
+결과에는 modelId/spaceId/unitId/status/sourceType/sourceImageAssetIds/assetId/modelUrl/roomData/createdAt/legacyImportRequired가 있다. roomData는 객체이며 추가 JSON.parse가 필요 없다. 반환된 modelId를 유지하고 최신 작업만 조회해 진행 작업을 섞지 않는다.
+
+| 상태 | 표시·후속 작업 |
+|---|---|
+| ANALYZING | 해당 작업 Polling |
+| WAITING_FOR_CORRECTION | aiVertices/aiEdges로 사진별 보정 |
+| RECONSTRUCTING | 최종 좌표 대기 |
+| WAITING_FOR_MODEL_UPLOAD | finalVertices/finalEdges/viewerUp으로 3D 표시·수동 가구 배치·GLB 생성 |
+| SUCCESS | 검증·보존된 결과 자산 조회 |
+| FAILED | 원인 확인·재시도 판단 |
+
+사진 보정은 반환된 전체 vertices/edges에서 시작한다. UUID·imageIndex/sourceVertexId를 보존하고 사진 X/Y 범위·Z=0·같은 사진 내 간선 조건을 지킨다. 화면에서 축소된 좌표를 원본 pixel 좌표로 보내지 않는다. 재구성의 3D 좌표는 별도 좌표계다.
+
+SUCCESS만 확인하지 말고 실제 점·선·방의 표시도 확인한다. 빈 배열을 의미 있는 방으로 판단하지 않는다. 가구 자동 추천은 현재 API에 포함되지 않는다.
+
+## 최종 GLB 저장
+
+업로드 대기 상태에서 방과 가구를 합친 GLB를 만들고 같은 upload-session 절차로 검증한다.
 
 ```json
 {
-  "propertyId": 1,
-  "ownerId": 1,
-  "roomName": "거실",
-  "pricePerNight": 100000,
-  "maxGuests": 2
+  "unitId":10,"kind":"MODEL","contentType":"model/gltf-binary",
+  "sizeBytes":250000,"spaceId":20,"modelId":30,
+  "sourceImageAssetIds":[41,42,43,44]
 }
 ```
 
-- 성공 상태: `201 Created`
-- 응답의 `roomId`를 이후 모든 3D 작업 경로에 사용합니다.
-- 이미지 URL은 이 요청에 포함하지 않습니다.
+완료 응답의 asset ID와 다시 조회한 모델의 assetId/status=SUCCESS를 확인한다. 서버는 GLB 내용·용량·공간/작업/원본 자산 일치를 확인한다. 임의 외부 modelUrl을 등록하는 구 PUT 경로를 사용하지 않는다. 같은 세션 완료는 확정 자산을 재사용하며 완료 파일 덮어쓰기를 허용하지 않는다.
 
-## 2. 여러 이미지 분석 시작
+## 매물·조회
 
-```http
-POST /api/rooms/{roomId}/models/analyze
-Content-Type: application/json
-```
+| Method | 경로 | 역할 |
+|---|---|---|
+| POST | /api/v2/units/{unitId}/listings | 매물 초안 |
+| PUT / PATCH | /api/v2/listings/{listingId} | expectedVersion으로 충돌 확인 후 수정 |
+| POST | /api/v2/listings/{listingId}/publish | 버전·게시 조건 확인 후 공개 |
+| POST | /api/v2/listings/{listingId}/hide | 숨김 |
+| POST | /api/v2/listings/{listingId}/complete | 거래 완료 |
+| POST | /api/v2/listings/{listingId}/reopen | 거래 재개 |
+| GET | /api/v2/listings | 공개 검색 |
+| GET | /api/v2/listings/map | 지도 범위 조회 |
+| GET | /api/v2/listings/{listingId} | 공개 상세 |
+| GET | /api/v2/listings/{listingId}/assets/{assetId} | 해당 매물의 공개 사진·모델 |
+| PUT / DELETE | /api/v2/listings/{listingId}/favorite | 관심 매물 |
+| POST | /api/v2/listings/{listingId}/inquiries | 문의 |
 
-```json
-{
-  "imageUrls": [
-    "https://bucket.example/room-1.jpg",
-    "https://bucket.example/room-2.jpg"
-  ]
-}
-```
+공간별 modelSelections는 spaceId/selectedModelId/modelAssetId를 함께 지정한다. 서로 다른 작업과 자산을 임의 연결하지 않는다. 버전 충돌 때는 최신 값을 확인하고 사용자 의도에 맞게 다시 처리한다. [ListingDto](../src/main/kotlin/com/hanyang/backend/domain/listing/ListingDto.kt)를 기준으로 필수 필드를 확인한다.
 
-- 성공 상태: `202 Accepted`
-- `imageUrls`는 비어 있지 않은 문자열을 최소 1개 포함해야 합니다. 현재 백엔드는 각 문자열의 URL 형식이나 S3 주소 여부까지 검증하지 않습니다.
-- 정상 응답의 초기 상태는 `ANALYZING`입니다.
+## AI 내부 통신
 
-## 3. 상태 조회
+GET /api/internal/ai/assets/{assetId}/content와 POST /api/internal/ai/webhook는 AI 전용이며 X-AI-Service-Key를 사용한다. 브라우저에 키를 넣거나 공개 프록시로 내부 경로를 열지 않는다. 원본 GET과 callback 양방향 접근이 필요하다.
 
-```http
-GET /api/rooms/{roomId}/models/status
-```
-
-```json
-{
-  "modelId": 10,
-  "roomId": 1,
-  "status": "WAITING_FOR_CORRECTION",
-  "modelUrl": null,
-  "roomData": {
-    "aiVertices": [],
-    "aiEdges": []
-  }
-}
-```
-
-`roomData`는 JSON 문자열이 아니라 객체입니다. 별도의 `JSON.parse()`를 호출하지 않습니다. 1차 AI 결과는 `aiVertices`·`aiEdges`, 최종 재구성 결과는 `finalVertices`·`finalEdges` 키를 사용합니다. 프론트가 보정·재구성 API를 호출할 때에는 편집한 배열을 요청 필드 `vertices`·`edges`로 전달합니다.
-
-| status | 프론트 동작 |
-| --- | --- |
-| `ANALYZING` | Polling 유지 |
-| `WAITING_FOR_CORRECTION` | `roomData`로 좌표 편집 화면 표시 |
-| `RECONSTRUCTING` | Polling 유지 |
-| `WAITING_FOR_MODEL_UPLOAD` | `roomData`의 최종 좌표로 모델을 생성하고 영속 저장소에 업로드 |
-| `SUCCESS` | `modelUrl`로 최종 모델 표시 |
-| `FAILED` | 오류 안내 후 재시도 여부 결정 |
-
-AI가 재구성을 마치고 최종 좌표를 `SUCCESS` Webhook으로 전달하면, 백엔드 상태는 곧바로 `SUCCESS`가 되지 않고 `WAITING_FOR_MODEL_UPLOAD`로 전이합니다. 이때 상태 조회 응답은 다음과 같습니다.
-
-```json
-{
-  "modelId": 10,
-  "roomId": 1,
-  "status": "WAITING_FOR_MODEL_UPLOAD",
-  "modelUrl": null,
-  "roomData": {
-    "finalVertices": [],
-    "finalEdges": []
-  }
-}
-```
-
-프론트는 이 응답의 `modelId`와 최종 좌표를 사용해 다음 단계를 진행합니다. AI 요청 본문에 레거시 `modelUrl`, `fileSizeMb`, `format` 필드가 `null`로 포함되더라도 백엔드는 이를 사용하지 않습니다. 최종 `modelUrl`의 유일한 등록 경로는 프론트의 결과 등록 `PUT` API입니다.
-
-## 4. 보정 좌표 제출 및 재구성 시작
-
-```http
-POST /api/rooms/{roomId}/models/reconstruct
-Content-Type: application/json
-```
-
-```json
-{
-  "vertices": [
-    {
-      "id": "vertex-1",
-      "x": 10.0,
-      "y": 20.0,
-      "z": 0.0,
-      "imageIndex": 0
-    }
-  ],
-  "edges": []
-}
-```
-
-- 성공 상태: `202 Accepted`
-- 프론트는 correction과 reconstruct를 별도로 호출하지 않습니다.
-- 백엔드가 AI correction 응답 완료 후 reconstruct 요청을 순서대로 전송합니다.
-- 정상 응답 상태는 `RECONSTRUCTING`입니다.
-- `vertices`는 최소 1개가 필요하며 vertex·edge ID는 비어 있거나 중복될 수 없습니다.
-- 모든 좌표는 유한한 숫자여야 하고, 각 edge의 양 끝점은 요청의 vertex ID를 참조해야 합니다.
-
-## 5. 최종 모델 파일 업로드 결과 등록
-
-`WAITING_FOR_MODEL_UPLOAD` 상태에서 프론트는 `roomData`의 최종 좌표로 모델 파일을 생성하고 S3 등의 영속 저장소에 업로드합니다. 업로드가 끝나면 상태 조회에서 받은 `modelId`로 결과를 등록합니다.
-
-```http
-PUT /api/rooms/{roomId}/models/{modelId}/result
-Content-Type: application/json
-```
-
-```json
-{
-  "modelUrl": "https://bucket.example/models/room-1.glb",
-  "fileSizeMb": 12.34,
-  "format": "glb"
-}
-```
-
-- 성공 상태: `200 OK`
-- `modelUrl`은 필수이며, 2,048자 이하이면서 호스트를 포함한 유효한 `http` 또는 `https` 절대 주소여야 합니다.
-- 프론트 계약상 `modelUrl`은 세션이 끝난 뒤에도 조회 가능한 S3/CDN 등의 영속 URL이어야 합니다. 현재 백엔드는 URL의 접근 가능성이나 만료 여부는 검사하지 않고 `http`·`https` 절대 주소와 호스트 형식만 검증합니다.
-- `fileSizeMb`와 `format`은 선택값입니다. `fileSizeMb`는 양수이면서 정수 8자리와 소수 2자리까지 허용되고, `format`은 비어 있지 않은 20자 이하 문자열이어야 합니다. 전달한 `format`은 소문자로 정규화됩니다.
-- 백엔드는 `roomId`와 `modelId`가 같은 작업을 가리키는지 확인합니다.
-- 정상 처리 시 URL과 메타데이터를 저장하고 상태를 `SUCCESS`로 전이합니다.
-- `PUT` 응답에 최종 `SUCCESS`와 `modelUrl`이 포함되므로 프론트는 이 응답을 바로 사용할 수 있습니다.
-- 저장 상태를 다시 확인하려면 프론트가 `GET /api/rooms/{roomId}/models/status`를 명시적으로 호출합니다. 백엔드는 `PUT` 이후 `GET`을 자동 호출하지 않습니다.
-- `fileSizeMb`와 `format`은 DB에 저장되지만 현재 상태 응답 DTO에는 포함되지 않습니다.
-- 이미 `SUCCESS`인 작업에 같은 `modelUrl`과 동일한 메타데이터를 다시 보내는 요청은 멱등하게 성공합니다. 재요청에서 선택 메타데이터를 생략할 수는 있지만, 다른 URL이나 충돌하는 메타데이터로는 덮어쓸 수 없습니다.
-
-```json
-{
-  "modelId": 10,
-  "roomId": 1,
-  "status": "SUCCESS",
-  "modelUrl": "https://bucket.example/models/room-1.glb",
-  "roomData": {
-    "finalVertices": [],
-    "finalEdges": []
-  }
-}
-```
-
-`POST /api/rooms/{roomId}/models/refresh`는 Webhook 유실에 대비해 AI 처리 상태와 1차 또는 최종 좌표를 다시 조회해 반영합니다. 최종 모델 URL을 만들거나 가져오는 API가 아니므로, 모델 업로드 완료 처리는 반드시 위 `PUT` API를 사용합니다.
-
-## 오류 응답
-
-```json
-{
-  "code": "INVALID_MODEL_STATE",
-  "message": "현재 상태에서는 재구성을 시작할 수 없습니다. status=ANALYZING"
-}
-```
-
-- 잘못된 요청 값 또는 JSON: `400 Bad Request`
-- 존재하지 않는 `roomId`, `modelId`, `aiRoomId`: 현재 `400 Bad Request`의 `INVALID_ARGUMENT`
-- 현재 작업 상태와 맞지 않는 요청: `409 Conflict`
-- `WAITING_FOR_MODEL_UPLOAD` 이전의 최종 결과 등록 또는 완료된 모델의 URL 변경: `409 Conflict`
-
-## 더 이상 사용하지 않는 경로와 필드
-
-다음 경로는 중복 계약을 제거하면서 삭제했습니다.
-
-```text
-GET  /api/rooms/{roomId}/status
-GET  /api/rooms/{roomId}
-POST /api/rooms/{roomId}/correction
-PATCH /api/rooms/{roomId}/models/correction
-```
-
-방 생성 요청의 `originalImageUrl`도 삭제했습니다. 모든 이미지 URL은 분석 요청의 `imageUrls` 배열로 전달합니다.
+백엔드의 AI 요청은 /api/v1/rooms/analyze → /api/v1/rooms/{aiRoomId}/correction → /api/v1/rooms/{aiRoomId}/reconstruct다. AI의 room UUID와 사용자 API의 정수 modelId/spaceId를 구분한다. AI 소스·가중치는 별도 팀원 범위로 공개하지 않는다.
