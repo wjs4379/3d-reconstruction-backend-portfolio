@@ -32,7 +32,8 @@ class OutboxAnalyzeEnqueueTest {
         val imageUrls = listOf(
             "https://example.com/room-1.jpg",
             "https://example.com/room-2.jpg",
-            "https://example.com/room-3.jpg"
+            "https://example.com/room-3.jpg",
+            "https://example.com/room-4.jpg"
         )
         var savedEvent: OutboxEvent? = null
 

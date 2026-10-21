@@ -4,7 +4,7 @@ import jakarta.persistence.* //JPA 관련 어노테이션 사용
 import java.time.LocalDateTime //날짜와 시간을 표현하기 위한 클래스
 
 @Entity //DB에 저장되는 클래스다.
-@Table(name = "users") //DB와 연결시켜주는데 DB는 테이블명이 복수형을 자주 씀. 그래서 users
+@Table(name = "users", uniqueConstraints = [UniqueConstraint(name = "uk_user_social_identity", columnNames = ["provider", "provider_id"])]) //DB와 연결시켜주는데 DB는 테이블명이 복수형을 자주 씀. 그래서 users
 class User(
     @Id //Primary Key. 거의 필수
     @GeneratedValue(strategy = GenerationType.IDENTITY)//DB가 ID 값을 자동생성. 항상 필수는 아니고 ID 자동생성할 때만 붙인다.

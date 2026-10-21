@@ -1,0 +1,93 @@
+# Standalone CloudFront HTTP-origin stack; do not merge with other Compose files.
+# Keep private RDS/S3 and real OAuth. This does not provide origin-side TLS.
+name: metaround-aws
+services:
+  app:
+    build: {context: .}
+    image: metaround-backend:local
+    init: true
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Seoul
+      DB_URL: ${DB_URL:?Set an RDS JDBC URL with verified TLS}
+      DB_USERNAME: ${DB_USERNAME:?Set the non-master application DB user}
+      DB_PASSWORD: ${DB_PASSWORD:?Set the application DB password}
+      JWT_SECRET: ${JWT_SECRET:?Set a random JWT secret}
+      JWT_ISSUER: metaround
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      KAKAO_APP_ID: ${KAKAO_APP_ID:?Set the numeric Kakao app ID}
+      KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY:?Set the Kakao OAuth client identifier}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:?Set the server-only Kakao client secret}
+      KAKAO_REDIRECT_URI: https://${API_DOMAIN}/oauth/callback/kakao
+      KAKAO_LOCAL_REST_API_KEY: ${KAKAO_LOCAL_REST_API_KEY:?Set the server-only address API key}
+      CORS_ALLOWED_ORIGINS: https://${API_DOMAIN:?Set the CloudFront distribution hostname}
+      APP_PUBLIC_BASE_URL: https://${API_DOMAIN}
+      MEDIA_MODE: s3
+      MEDIA_S3_BUCKET: ${MEDIA_S3_BUCKET:?Set a private versioned S3 bucket}
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      AI_PIPELINE_ENABLED: ${AI_PIPELINE_ENABLED:-false}
+      AI_SERVICE_KEY: ${AI_SERVICE_KEY:-}
+      AI_SERVER_BASE_URL: ${AI_SERVER_BASE_URL:-http://127.0.0.1:8000}
+      APP_BACKEND_BASE_URL: ${APP_BACKEND_BASE_URL:-http://127.0.0.1:8080}
+      APP_WEBHOOK_URL: ${APP_BACKEND_BASE_URL:-http://127.0.0.1:8080}/api/internal/ai/webhook
+      OUTBOX_ENABLED: "true"
+      OUTBOX_WORKER_ENABLED: ${OUTBOX_WORKER_ENABLED:-false}
+      APPROVED_LEGACY_MODEL_IDS: ""
+      SERVER_FORWARD_HEADERS_STRATEGY: native
+      JAVA_TOOL_OPTIONS: -Duser.timezone=Asia/Seoul -Xms128m -Xmx512m -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError
+    # Only a private GPU host may access this listener; never bind 0.0.0.0.
+    ports: ["${APP_BIND_ADDRESS:-127.0.0.1}:8080:8080"]
+    volumes:
+      - ${RDS_TRUST_DIRECTORY:?Prepare the RDS CA truststore}:/etc/rds:ro
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 900m
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+    logging: &bounded-logs
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+  web:
+    build:
+      context: ../FrontEnd
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+        VITE_KAKAO_REST_API_KEY: ${VITE_KAKAO_REST_API_KEY:?Set the public Kakao login REST key}
+        VITE_KAKAO_REDIRECT_URI: https://${API_DOMAIN}/oauth/callback/kakao
+        VITE_MAP_TILE_URL: ${VITE_MAP_TILE_URL:?Set the map tile URL}
+        VITE_MAP_TILE_ATTRIBUTION: ${VITE_MAP_TILE_ATTRIBUTION:-&copy; OpenStreetMap contributors}
+    image: metaround-web:local
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *bounded-logs
+  nginx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    depends_on:
+      app: {condition: service_healthy}
+      web: {condition: service_healthy}
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?Set the default CloudFront distribution hostname}
+      CLOUDFRONT_ORIGIN_SECRET: ${CLOUDFRONT_ORIGIN_SECRET:?Set a random origin-only secret}
+      NGINX_ENVSUBST_FILTER: '^(API_DOMAIN|CLOUDFRONT_ORIGIN_SECRET)$'
+    # EC2 SG must allow port80 ONLY from the CloudFront origin-facing prefix list.
+    # Viewer HTTPS terminates at CloudFront; the restricted origin transport is HTTP.
+    ports: ["80:80"]
+    volumes:
+      - ./deploy/nginx/cloudfront.conf.template:/etc/nginx/templates/default.conf.template:ro
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *bounded-logs

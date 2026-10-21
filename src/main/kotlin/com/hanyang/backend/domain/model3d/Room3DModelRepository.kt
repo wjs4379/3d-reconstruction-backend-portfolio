@@ -19,6 +19,8 @@ interface Room3DModelRepository : JpaRepository<Room3DModel, Long> {
 
     fun findByAiRoomId(aiRoomId: String): Optional<Room3DModel>
 
+    fun findTop100ByRoomIdOrderByUploadedAtDescIdDesc(roomId: Long): List<Room3DModel>
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     fun findFirstByRoomIdOrderByUploadedAtDesc(roomId: Long): Optional<Room3DModel>
 

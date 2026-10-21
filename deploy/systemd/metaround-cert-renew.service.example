@@ -1,0 +1,10 @@
+[Unit]
+Description=Renew Metaround HTTPS certificate and reload nginx
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/metaround/BackEnd
+# Replace domain and contact email; values are public, no passwords go in this unit.
+ExecStart=/opt/metaround/BackEnd/deploy/tls.sh renew REPLACE_DOMAIN REPLACE_EMAIL /etc/metaround/letsencrypt /var/lib/metaround/acme /etc/metaround/aws.env

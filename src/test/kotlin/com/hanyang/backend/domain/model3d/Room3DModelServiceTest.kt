@@ -2,6 +2,7 @@ package com.hanyang.backend.domain.model3d
 
 import com.hanyang.backend.domain.model3d.outbox.OutboxEventRepository
 import com.hanyang.backend.domain.property.Property
+import com.hanyang.backend.domain.room.AiWebhookPhase
 import com.hanyang.backend.domain.room.AiWebhookRequest
 import com.hanyang.backend.domain.room.RenderStatus
 import com.hanyang.backend.domain.room.Room
@@ -659,6 +660,75 @@ class Room3DModelServiceTest {
         }
 
         Mockito.verifyNoInteractions(room3DModelRepository, aiServerClient)
+    }
+
+    @Test
+    fun `managed callback without a durable phase cannot advance state or overwrite coordinates`() {
+        val model = createModel(ModelStatus.ANALYZING).apply { sourceType = ModelSourceType.AI_PIPELINE }
+        Mockito.`when`(room3DModelRepository.findByAiRoomIdForUpdate(aiRoomId)).thenReturn(Optional.of(model))
+        service.handleAiWebhook(AiWebhookRequest(aiRoomId, RenderStatus.SUCCESS, """{"aiVertices":[],"aiEdges":[]}"""))
+        assertEquals(ModelStatus.ANALYZING, model.status)
+        assertEquals(null, model.roomData)
+        service.handleAiWebhook(AiWebhookRequest(aiRoomId, RenderStatus.SUCCESS, """{"aiVertices":[],"aiEdges":[]}""", AiWebhookPhase.ANALYZE))
+        assertEquals(ModelStatus.WAITING_FOR_CORRECTION, model.status)
+    }
+
+    @Test
+    fun `late analysis failure cannot fail reconstruction but reconstruction failure can`() {
+        val original = """{"aiVertices":[],"aiEdges":[]}"""
+        val model = createModel(ModelStatus.RECONSTRUCTING).apply { sourceType = ModelSourceType.AI_PIPELINE; roomData = original }
+        Mockito.`when`(room3DModelRepository.findByAiRoomIdForUpdate(aiRoomId)).thenReturn(Optional.of(model))
+        service.handleAiWebhook(AiWebhookRequest(aiRoomId, RenderStatus.FAILED, """{"message":"old analysis"}""", AiWebhookPhase.ANALYZE))
+        assertEquals(ModelStatus.RECONSTRUCTING, model.status)
+        assertEquals(original, model.roomData)
+        service.handleAiWebhook(AiWebhookRequest(aiRoomId, RenderStatus.FAILED, """{"message":"current reconstruction"}""", AiWebhookPhase.RECONSTRUCT))
+        assertEquals(ModelStatus.FAILED, model.status)
+        assertEquals("""{"message":"current reconstruction"}""", model.roomData)
+    }
+
+    @Test
+    fun `analysis callback cannot start reconstruction before the persisted correction command`() {
+        val model = createModel(ModelStatus.WAITING_FOR_CORRECTION).apply { sourceType = ModelSourceType.AI_PIPELINE }
+        Mockito.`when`(room3DModelRepository.findByAiRoomIdForUpdate(aiRoomId)).thenReturn(Optional.of(model))
+        service.handleAiWebhook(AiWebhookRequest(aiRoomId, RenderStatus.RECONSTRUCTING, null, AiWebhookPhase.ANALYZE))
+        service.handleAiWebhook(AiWebhookRequest(aiRoomId, RenderStatus.RECONSTRUCTING, null, AiWebhookPhase.RECONSTRUCT))
+        assertEquals(ModelStatus.WAITING_FOR_CORRECTION, model.status)
+    }
+
+    @Test
+    fun `refresh preserves native final coordinates with independent viewer up metadata`() {
+        val model = createModel(ModelStatus.RECONSTRUCTING)
+        Mockito.`when`(room3DModelRepository.findById(10L)).thenReturn(Optional.of(model))
+        Mockito.`when`(room3DModelRepository.findByIdAndRoomId(10L, 1L)).thenReturn(Optional.of(model))
+        Mockito.`when`(aiServerClient.getRoom(aiRoomId)).thenReturn(AiRoomResponseDto(
+            id = aiRoomId, status = "completed",
+            finalVertices = listOf(VertexDto("native", 4.0, 3.0, 2.5)),
+            finalEdges = emptyList(), viewerUp = listOf(0.0, 0.0, 1.0)
+        ))
+        val response = service.refreshFromAi(1L, 10L)
+        val data = response.roomData as Map<*, *>
+        assertEquals(ModelStatus.WAITING_FOR_MODEL_UPLOAD, response.status)
+        assertEquals(listOf(0.0, 0.0, 1.0), data["viewerUp"])
+        val point = (data["finalVertices"] as List<*>).single() as Map<*, *>
+        assertEquals(4.0, point["x"]); assertEquals(3.0, point["y"]); assertEquals(2.5, point["z"])
+    }
+
+    @Test
+    fun `invalid callback viewer up cannot commit reconstruction state or coordinates`() {
+        val model = createModel(ModelStatus.RECONSTRUCTING).apply { sourceType = ModelSourceType.AI_PIPELINE }
+        Mockito.`when`(room3DModelRepository.findByAiRoomIdForUpdate(aiRoomId)).thenReturn(Optional.of(model))
+        for (up in listOf("[0,0,0]", "[0,1]", """[0,"up",1]""")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                service.handleAiWebhook(AiWebhookRequest(aiRoomId, RenderStatus.SUCCESS,
+                    """{"finalVertices":[],"finalEdges":[],"viewerUp":$up}""", AiWebhookPhase.RECONSTRUCT))
+            }
+            assertEquals(ModelStatus.RECONSTRUCTING, model.status)
+            assertEquals(null, model.roomData)
+        }
+        val valid = """{"finalVertices":[],"finalEdges":[],"viewerUp":[0,0,1]}"""
+        service.handleAiWebhook(AiWebhookRequest(aiRoomId, RenderStatus.SUCCESS, valid, AiWebhookPhase.RECONSTRUCT))
+        assertEquals(ModelStatus.WAITING_FOR_MODEL_UPLOAD, model.status)
+        assertEquals(valid, model.roomData)
     }
 
     private fun createModel(status: ModelStatus): Room3DModel {

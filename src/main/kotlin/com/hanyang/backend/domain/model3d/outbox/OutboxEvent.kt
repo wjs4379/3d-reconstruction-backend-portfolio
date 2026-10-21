@@ -16,7 +16,8 @@ import java.time.LocalDateTime
 import java.util.UUID
 
 enum class OutboxEventType {
-    AI_ANALYZE
+    AI_ANALYZE,
+    AI_CORRECTION_RECONSTRUCT
 }
 
 enum class OutboxStatus {

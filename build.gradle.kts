@@ -38,14 +38,22 @@ dependencies {
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
 	implementation("org.springframework.boot:spring-boot-starter-webflux")
+	implementation("org.springframework.boot:spring-boot-starter-webclient")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-data-redis-reactive")
 	implementation("org.springframework.boot:spring-boot-starter-kafka")
-	implementation("org.springframework.boot:spring-boot-starter-webflux")
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 	implementation("org.springframework.boot:spring-boot-starter-websocket")
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
+
+	implementation("org.springframework.boot:spring-boot-starter-security")
+	implementation("org.springframework.boot:spring-boot-starter-actuator")
+	implementation("org.springframework.boot:spring-boot-starter-flyway")
+	runtimeOnly("org.flywaydb:flyway-mysql")
+	implementation("software.amazon.awssdk:s3:2.55.12")
+
+	implementation("tools.jackson.module:jackson-module-kotlin")
 
 	//jwt
 	implementation("io.jsonwebtoken:jjwt-api:0.12.5")
@@ -58,6 +66,10 @@ dependencies {
 	annotationProcessor("org.projectlombok:lombok")
 
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
+	testImplementation("org.springframework.boot:spring-boot-starter-security-test")
+	testImplementation("org.springframework.security:spring-security-test")
+	testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+	testImplementation("org.testcontainers:testcontainers-mysql")
 	testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-data-redis-reactive-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-kafka-test")
@@ -67,7 +79,6 @@ dependencies {
 	// H2 2.4.240 has a regression around enum CHECK constraints in multi-session JPA tests.
 	testRuntimeOnly("com.h2database:h2:2.3.232")
 
-	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
@@ -82,6 +93,16 @@ tasks.withType<Test> {
 	useJUnitPlatform()
 }
 
-tasks.withType<Test> {
-	useJUnitPlatform()
+// Local fixture server uses only the test classpath; it is never packaged in the production jar.
+tasks.register<org.springframework.boot.gradle.tasks.run.BootRun>("estateSmoke") {
+    group = "verification"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.hanyang.backend.smoke.EstateSmokeServerKt")
+}
+
+// Real persistent MySQL for local demos; fixture login stays outside the production jar.
+tasks.register<org.springframework.boot.gradle.tasks.run.BootRun>("estateDemo") {
+    group = "verification"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.hanyang.backend.smoke.EstateDemoServerKt")
 }

@@ -1,14 +1,18 @@
 spring:
+  flyway:
+    enabled: false
   datasource:
     url: jdbc:h2:mem:spatial_asset_test;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
     username: sa
     password:
     driver-class-name: org.h2.Driver
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: create-drop
     properties:
       hibernate:
+        default_batch_fetch_size: 50
         show_sql: false
         format_sql: false
 
@@ -18,6 +22,11 @@ ai:
 
 app:
   webhook-url: http://localhost:8080/api/webhook
+  cors:
+    allowed-origins: http://localhost:5173
+  media:
+    mode: local
+    local-directory: ${java.io.tmpdir}/gp-estate-test-media
   jwt:
     secret: test-only-jwt-secret-with-at-least-32-bytes
 

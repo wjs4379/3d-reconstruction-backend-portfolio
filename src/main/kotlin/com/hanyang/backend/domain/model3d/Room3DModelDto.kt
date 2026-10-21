@@ -13,7 +13,7 @@ import java.math.BigDecimal
 
 // 프론트가 S3 이미지 URL을 백엔드에 넘길 때 사용
 data class AnalyzeModelRequest(
-    @field:NotEmpty(message = "이미지 URL은 최소 1개 이상 필요합니다.")
+    @field:Size(min = AiPayloadLimits.SOURCE_IMAGE_COUNT, max = AiPayloadLimits.SOURCE_IMAGE_COUNT, message = "같은 공간을 촬영한 사진 4장이 필요합니다.")
     val imageUrls: List<@NotBlank(message = "비어 있는 이미지 URL은 전송할 수 없습니다.") String>
 )
 
@@ -111,6 +111,10 @@ data class AiRoomResponseDto(
     val isCorrected: Boolean = false,
 
     val finalVertices: List<VertexDto>? = null,
-    val finalEdges: List<EdgeDto>? = null
+    val finalEdges: List<EdgeDto>? = null,
+    val viewerUp: List<Double>? = null
 )
 
+
+/** Immutable correction command persisted with the RECONSTRUCTING state transition. */
+data class AiCorrectionReconstructRequestDto(val aiRoomId: String, val correction: CorrectionRequestDto)

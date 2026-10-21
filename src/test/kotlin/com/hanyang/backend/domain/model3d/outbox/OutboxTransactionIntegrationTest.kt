@@ -39,7 +39,9 @@ class OutboxTransactionIntegrationTest @Autowired constructor(
         val room = createRoom()
         val imageUrls = listOf(
             "https://example.com/integration-1.jpg",
-            "https://example.com/integration-2.jpg"
+            "https://example.com/integration-2.jpg",
+            "https://example.com/integration-3.jpg",
+            "https://example.com/integration-4.jpg"
         )
         val existingEventIds = outboxRepository.findAll()
             .mapNotNull(OutboxEvent::id)
@@ -79,7 +81,7 @@ class OutboxTransactionIntegrationTest @Autowired constructor(
         val thrown = assertThrows(IllegalStateException::class.java) {
             room3DModelService.analyzeRoom(
                 requireNotNull(room.id),
-                AnalyzeModelRequest(listOf("https://example.com/rollback.jpg"))
+                AnalyzeModelRequest((1..4).map { "https://example.com/rollback-$it.jpg" })
             )
         }
 

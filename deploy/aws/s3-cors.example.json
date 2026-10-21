@@ -1,0 +1,24 @@
+{
+  "CORSRules": [
+    {
+      "AllowedOrigins": [
+        "https://REPLACE_APP_DOMAIN"
+      ],
+      "AllowedMethods": [
+        "GET",
+        "HEAD"
+      ],
+      "AllowedHeaders": [
+        "Range"
+      ],
+      "ExposeHeaders": [
+        "ETag",
+        "Content-Length",
+        "Content-Type",
+        "Accept-Ranges",
+        "Content-Range"
+      ],
+      "MaxAgeSeconds": 300
+    }
+  ]
+}

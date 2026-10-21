@@ -3,6 +3,7 @@ package com.hanyang.backend.domain.model3d
 import com.hanyang.backend.domain.model3d.outbox.OutboxEvent
 import com.hanyang.backend.domain.model3d.outbox.OutboxEventRepository
 import com.hanyang.backend.domain.model3d.outbox.OutboxEventType
+import com.hanyang.backend.domain.room.AiWebhookPhase
 import com.hanyang.backend.domain.room.AiWebhookRequest
 import com.hanyang.backend.domain.room.RenderStatus
 import com.hanyang.backend.domain.room.RoomRepository
@@ -48,10 +49,11 @@ class Room3DModelService(
     @Transactional
     fun analyzeRoom(
         roomId: Long,
-        request: AnalyzeModelRequest
+        request: AnalyzeModelRequest,
+        webhookOverride: String? = null
     ): ModelStatusResponse {
-        require(request.imageUrls.isNotEmpty()) {
-            "이미지 URL은 최소 1개 이상 필요합니다."
+        require(request.imageUrls.size == AiPayloadLimits.SOURCE_IMAGE_COUNT && request.imageUrls.distinct().size == AiPayloadLimits.SOURCE_IMAGE_COUNT) {
+            "같은 공간을 촬영한 서로 다른 사진 4장이 필요합니다."
         }
         require(request.imageUrls.none(String::isBlank)) {
             "비어 있는 이미지 URL은 전송할 수 없습니다."
@@ -91,7 +93,7 @@ class Room3DModelService(
             roomId = model.aiRoomId,
             roomName = room.roomName,
             userId = toAiUserUuid(ownerId),
-            webhookUrl = webhookUrl
+            webhookUrl = webhookOverride ?: webhookUrl
         )
         if (outboxEnabled) {
             val now = LocalDateTime.now()
@@ -135,23 +137,36 @@ class Room3DModelService(
     @Transactional
     fun applyCorrectionAndReconstruct(
         roomId: Long,
-        request: CorrectionRequestDto
+        request: CorrectionRequestDto,
+        modelId: Long? = null
     ): ModelStatusResponse {
         validateCorrection(request)
 
-        val model = findLatestModelByRoomIdForUpdate(roomId)
+        val model = if (modelId == null) findLatestModelByRoomIdForUpdate(roomId) else
+            room3DModelRepository.findByIdAndRoomId(modelId, roomId).orElseThrow { IllegalArgumentException("해당 공간의 모델이 없습니다.") }
         check(model.status == ModelStatus.WAITING_FOR_CORRECTION) {
             "현재 상태에서는 재구성을 시작할 수 없습니다. status=${model.status}"
         }
 
         model.status = ModelStatus.RECONSTRUCTING
 
-        dispatchAfterCommit(
-            aiRoomId = model.aiRoomId,
-            operation = "correction-and-reconstruct"
-        ) {
-            aiServerClient.sendCorrection(model.aiRoomId, request)
-                .then(aiServerClient.reconstruct(model.aiRoomId))
+        if (outboxEnabled) {
+            val now = LocalDateTime.now()
+            outboxEventRepository.save(OutboxEvent(
+                eventType = OutboxEventType.AI_CORRECTION_RECONSTRUCT,
+                aggregateId = model.aiRoomId,
+                payload = jsonMapper.writeValueAsString(AiCorrectionReconstructRequestDto(model.aiRoomId, request)),
+                nextAttemptAt = now, createdAt = now, updatedAt = now
+            ))
+        } else {
+            // Compatibility for historical service tests only; managed V2 requires the durable dispatcher.
+            dispatchAfterCommit(
+                aiRoomId = model.aiRoomId,
+                operation = "correction-and-reconstruct"
+            ) {
+                aiServerClient.sendCorrection(model.aiRoomId, request)
+                    .then(aiServerClient.reconstruct(model.aiRoomId))
+            }
         }
 
         return model.toStatusResponse()
@@ -177,13 +192,25 @@ class Room3DModelService(
             }
         }
 
+        return completeUpload(model, modelUrl, request.fileSizeMb, format)
+    }
+
+    @Transactional
+    fun completeVerifiedModelUpload(roomId: Long, modelId: Long, assetId: Long, sizeBytes: Long): ModelStatusResponse {
+        val model = room3DModelRepository.findByIdAndRoomId(modelId, roomId)
+            .orElseThrow { IllegalArgumentException("해당 공간의 모델이 없습니다.") }
+        val sizeMb = java.math.BigDecimal(sizeBytes).divide(java.math.BigDecimal(1048576), 2, java.math.RoundingMode.HALF_UP)
+        return completeUpload(model, "/api/v2/media/assets/$assetId/content", sizeMb, "glb")
+    }
+
+    private fun completeUpload(model: Room3DModel, modelUrl: String, fileSizeMb: java.math.BigDecimal?, format: String?): ModelStatusResponse {
         if (model.status == ModelStatus.SUCCESS) {
             check(model.modelUrl == modelUrl) {
                 "이미 완료된 모델의 URL은 변경할 수 없습니다."
             }
             check(
-                request.fileSizeMb == null ||
-                    model.fileSizeMb?.compareTo(request.fileSizeMb) == 0
+                fileSizeMb == null ||
+                    model.fileSizeMb?.compareTo(fileSizeMb) == 0
             ) {
                 "이미 완료된 모델의 파일 크기는 변경할 수 없습니다."
             }
@@ -201,7 +228,7 @@ class Room3DModelService(
         }
 
         model.modelUrl = modelUrl
-        request.fileSizeMb?.let { model.fileSizeMb = it }
+        fileSizeMb?.let { model.fileSizeMb = it }
         format?.let { model.format = it }
         model.status = ModelStatus.SUCCESS
 
@@ -214,12 +241,16 @@ class Room3DModelService(
      *
      * AI 서버의 현재 상태를 다시 조회해서 백엔드 DB에 반영합니다.
      */
-    fun refreshFromAi(roomId: Long): ModelStatusResponse {
-        val snapshot = findLatestModelByRoomId(roomId)
+    fun refreshFromAi(roomId: Long, selectedModelId: Long? = null): ModelStatusResponse {
+        val snapshot = if (selectedModelId == null) findLatestModelByRoomId(roomId) else
+            room3DModelRepository.findById(selectedModelId).orElseThrow { IllegalArgumentException("해당 모델이 없습니다.") }
+        require(snapshot.room.id == roomId) { "해당 공간의 모델이 아닙니다." }
+        if (snapshot.status in setOf(ModelStatus.SUCCESS, ModelStatus.FAILED)) return snapshot.toStatusResponse()
         val modelId = requireNotNull(snapshot.id) {
             "상태를 갱신할 3D 모델의 modelId가 존재하지 않습니다."
         }
         val aiResponse = aiServerClient.getRoom(snapshot.aiRoomId)
+        validateViewerUp(aiResponse.viewerUp)
 
         return transactionOperations.execute {
             val model = room3DModelRepository.findByIdAndRoomId(modelId, roomId)
@@ -256,7 +287,8 @@ class Room3DModelService(
                 model.roomData = jsonMapper.writeValueAsString(
                     mapOf(
                         "aiVertices" to aiResponse.aiVertices,
-                        "aiEdges" to aiResponse.aiEdges
+                        "aiEdges" to aiResponse.aiEdges,
+                        "viewerUp" to aiResponse.viewerUp
                     )
                 )
             }
@@ -272,7 +304,8 @@ class Room3DModelService(
                 model.roomData = jsonMapper.writeValueAsString(
                     mapOf(
                         "finalVertices" to aiResponse.finalVertices,
-                        "finalEdges" to aiResponse.finalEdges
+                        "finalEdges" to aiResponse.finalEdges,
+                        "viewerUp" to aiResponse.viewerUp
                     )
                 )
             }
@@ -364,6 +397,13 @@ class Room3DModelService(
             }
 
         val currentStatus = model.status
+        // Managed jobs must identify the durable phase. A delayed analysis failure
+        // cannot terminate a newer reconstruction, and a manual upload has no AI job.
+        if (!webhookPhaseApplicable(model, request)) {
+            log.info("작업 단계가 일치하지 않는 AI webhook 무시. aiRoomId={}, phase={}, currentStatus={}",
+                request.aiRoomId, request.phase, currentStatus)
+            return
+        }
         val payloadApplicable = shouldApplyWebhookPayload(
             current = currentStatus,
             incoming = request.status
@@ -379,6 +419,7 @@ class Room3DModelService(
         } else {
             null
         }
+        validateViewerUp(parsedRoomData?.get("viewerUp"))
         val initialResultReady = hasInitialCoordinatePayload(parsedRoomData)
         val finalResultReady = hasFinalCoordinatePayload(parsedRoomData)
 
@@ -441,6 +482,21 @@ class Room3DModelService(
             model.status,
             roomDataUpdated
         )
+    }
+
+    private fun webhookPhaseApplicable(model: Room3DModel, request: AiWebhookRequest): Boolean {
+        if (model.sourceType == ModelSourceType.MANUAL_UPLOAD || model.status in setOf(ModelStatus.SUCCESS, ModelStatus.FAILED)) return false
+        val phase = request.phase ?: return model.sourceType == ModelSourceType.LEGACY_AI
+        val expectedPhase = when (model.status) {
+            ModelStatus.ANALYZING, ModelStatus.WAITING_FOR_CORRECTION -> AiWebhookPhase.ANALYZE
+            ModelStatus.RECONSTRUCTING, ModelStatus.WAITING_FOR_MODEL_UPLOAD -> AiWebhookPhase.RECONSTRUCT
+            ModelStatus.SUCCESS, ModelStatus.FAILED -> return false
+        }
+        if (phase != expectedPhase) return false
+        return when (phase) {
+            AiWebhookPhase.ANALYZE -> request.status in setOf(RenderStatus.ANALYZING, RenderStatus.WAITING_FOR_CORRECTION, RenderStatus.SUCCESS, RenderStatus.FAILED)
+            AiWebhookPhase.RECONSTRUCT -> request.status in setOf(RenderStatus.RECONSTRUCTING, RenderStatus.SUCCESS, RenderStatus.FAILED)
+        }
     }
 
     /**
@@ -597,6 +653,16 @@ class Room3DModelService(
         return modelUrl
     }
 
+    /** Viewer orientation metadata never rotates or rescales native AI coordinates. */
+    private fun validateViewerUp(raw: Any?) {
+        if (raw == null) return
+        require(raw is List<*> && raw.size == 3 &&
+            raw.all { it is Number && it.toDouble().isFinite() } &&
+            raw.any { (it as Number).toDouble() != 0.0 }) {
+            "viewerUp은 0벡터가 아닌 유한수 3개여야 합니다."
+        }
+    }
+
     private fun parseRoomDataObject(rawRoomData: String): Map<*, *> {
         val parsed = try {
             jsonMapper.readValue(rawRoomData, Any::class.java)
@@ -644,6 +710,7 @@ class Room3DModelService(
     ): Boolean {
         val vertices = verticesValue as? List<*> ?: return false
         val edges = edgesValue as? List<*> ?: return false
+        if (vertices.size > AiPayloadLimits.MAX_VERTICES || edges.size > AiPayloadLimits.MAX_EDGES) return false
         val vertexIds = mutableSetOf<String>()
 
         for (vertexValue in vertices) {
@@ -714,7 +781,7 @@ class Room3DModelService(
         vertices: List<VertexDto>?,
         edges: List<EdgeDto>?
     ): Boolean {
-        if (vertices == null || edges == null) {
+        if (vertices == null || edges == null || vertices.size > AiPayloadLimits.MAX_VERTICES || edges.size > AiPayloadLimits.MAX_EDGES) {
             return false
         }
 

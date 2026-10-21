@@ -1,0 +1,38 @@
+# Only CloudFront may reach this HTTP origin: SG prefix list + per-distribution secret.
+# Access logs omit query strings, OAuth codes, tokens, and the origin secret header.
+log_format metaround '$remote_addr [$time_local] "$request_method $uri $server_protocol" $request_id $status $body_bytes_sent $request_time';
+access_log /var/log/nginx/access.log metaround;
+server {
+    listen 80 default_server;
+    server_name ${API_DOMAIN};
+    if ($http_x_metaround_origin != "${CLOUDFRONT_ORIGIN_SECRET}") { return 404; }
+    server_tokens off;
+    add_header X-Request-ID $request_id always;
+    add_header Strict-Transport-Security "max-age=86400" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header X-Frame-Options SAMEORIGIN always;
+    client_max_body_size 26m;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 30s;
+    proxy_send_timeout 30s;
+    location = /actuator { return 404; }
+    location ^~ /actuator/ { return 404; }
+    location ^~ /api/internal/ai/ { return 404; }
+    location /api/ {
+        proxy_pass http://app:8080;
+        proxy_set_header X-Request-ID $request_id;
+        proxy_set_header Host ${API_DOMAIN};
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        # Viewer HTTPS policy + origin secret form the trusted edge boundary.
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Metaround-Origin "";
+    }
+    location / {
+        proxy_pass http://web:8080;
+        proxy_set_header Host ${API_DOMAIN};
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Metaround-Origin "";
+    }
+}

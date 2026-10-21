@@ -18,3 +18,25 @@ compose*.yaml
 compose*.yml
 README.md
 docs
+
+# Local uploaded assets, database backups, and certificates
+.local-media
+backups
+deploy/tls
+*.sql.gz
+*.tar.gz
+**/.DS_Store
+
+# AWS runtime configuration (the example stays tracked)
+deploy/*.env
+aws.env
+
+# Never send generated operator credentials/data in a build context.
+.runtime
+.aws
+**/ai_ed25519
+**/real-integration.env
+**/local-secrets.json
+*.sqlite
+*.sqlite3
+*.db

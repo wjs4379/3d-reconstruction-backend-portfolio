@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily Metaround estate backup in Asia/Seoul
+
+[Timer]
+OnCalendar=*-*-* 02:15:00 Asia/Seoul
+RandomizedDelaySec=600
+AccuracySec=1min
+Persistent=true
+Unit=metaround-estate-backup.service
+
+[Install]
+WantedBy=timers.target

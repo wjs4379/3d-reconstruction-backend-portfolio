@@ -1,96 +1,19 @@
-@baseUrl = http://localhost:8080
-@roomId = 1
-@modelId = replace-with-model-id-from-analyze-or-status-response
-@aiRoomId = replace-with-ai-room-id-from-log-or-db
-@imageUrl1 = https://example.com/room-1.jpg
-@imageUrl2 = https://example.com/room-2.jpg
+### Current protected V2 example. Supply a real OAuth-issued token locally.
+@base = http://localhost:8080
+@accessToken = REPLACE_LOCALLY_DO_NOT_COMMIT
 
-### 1. 방 메타데이터 생성
-POST {{baseUrl}}/api/rooms
-Content-Type: application/json
+### Production readiness; not an OAuth/AI E2E check.
+GET {{base}}/actuator/health/readiness
 
-{
-  "propertyId": 1,
-  "ownerId": 1,
-  "roomName": "테스트 방",
-  "pricePerNight": 100000,
-  "maxGuests": 2
-}
+### Current authenticated principal.
+GET {{base}}/api/auth/me
+Authorization: Bearer {{accessToken}}
 
-### 2. 여러 이미지 분석 시작
-POST {{baseUrl}}/api/rooms/{{roomId}}/models/analyze
-Content-Type: application/json
+### User-owned units.
+GET {{base}}/api/v2/me/units
+Authorization: Bearer {{accessToken}}
 
-{
-  "imageUrls": [
-    "{{imageUrl1}}",
-    "{{imageUrl2}}"
-  ]
-}
+### Public listings.
+GET {{base}}/api/v2/listings?page=0&size=20
 
-### 3. 상태 조회: ANALYZING 예상
-GET {{baseUrl}}/api/rooms/{{roomId}}/models/status
-Accept: application/json
-
-### AI 1차 분석 완료 Webhook 수동 테스트
-POST {{baseUrl}}/api/webhook
-Content-Type: application/json
-
-{
-  "aiRoomId": "{{aiRoomId}}",
-  "status": "WAITING_FOR_CORRECTION",
-  "roomDataJson": "{\"aiVertices\":[{\"id\":\"vertex-1\",\"x\":10.0,\"y\":20.0,\"z\":0.0,\"imageIndex\":0}],\"aiEdges\":[]}"
-}
-
-### 4. 상태 조회: WAITING_FOR_CORRECTION 및 roomData JSON 객체 예상
-GET {{baseUrl}}/api/rooms/{{roomId}}/models/status
-Accept: application/json
-
-### 5. 보정 데이터 전송 후 재구성 시작
-POST {{baseUrl}}/api/rooms/{{roomId}}/models/reconstruct
-Content-Type: application/json
-
-{
-  "vertices": [
-    {
-      "id": "vertex-1",
-      "x": 12.0,
-      "y": 21.0,
-      "z": 0.0,
-      "imageIndex": 0
-    }
-  ],
-  "edges": []
-}
-
-### 6. 상태 조회: RECONSTRUCTING 예상
-GET {{baseUrl}}/api/rooms/{{roomId}}/models/status
-Accept: application/json
-
-### AI 최종 재구성 완료 Webhook 수동 테스트
-POST {{baseUrl}}/api/webhook
-Content-Type: application/json
-
-{
-  "aiRoomId": "{{aiRoomId}}",
-  "status": "SUCCESS",
-  "roomDataJson": "{\"finalVertices\":[{\"id\":\"vertex-1\",\"x\":12.0,\"y\":21.0,\"z\":3.0,\"imageIndex\":0}],\"finalEdges\":[]}"
-}
-
-### 7. 상태 조회: WAITING_FOR_MODEL_UPLOAD, modelUrl=null, 최종 roomData 객체 예상
-GET {{baseUrl}}/api/rooms/{{roomId}}/models/status
-Accept: application/json
-
-### 8. 프론트 최종 모델 업로드 결과 등록
-PUT {{baseUrl}}/api/rooms/{{roomId}}/models/{{modelId}}/result
-Content-Type: application/json
-
-{
-  "modelUrl": "https://example.com/models/test-room.glb",
-  "fileSizeMb": 12.34,
-  "format": "glb"
-}
-
-### 9. 상태 조회: SUCCESS, modelUrl, 최종 roomData 객체 예상
-GET {{baseUrl}}/api/rooms/{{roomId}}/models/status
-Accept: application/json
+### See docs/frontend-api-contract.md for upload-session and four-photo analysis.
