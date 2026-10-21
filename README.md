@@ -58,7 +58,7 @@ flowchart LR
     AI -->|"인증된 원본 읽기 · 단계별 Webhook"| API
 ```
 
-기능별 패키지와 Controller → Service → Repository 계층을 둔 **모듈형 모놀리스**입니다. 웹 서비스의 정합성은 하나의 MySQL 트랜잭션에서 관리하고, 장시간 GPU 계산은 별도 AI 서버가 담당합니다. 현재 요청 처리에 Redis·Kafka는 사용하지 않습니다.
+기능별 패키지와 Controller → Service → Repository 계층을 둔 **기능별 패키지로 나눈 단일 애플리케이션**입니다. 웹 서비스의 정합성은 하나의 MySQL 트랜잭션에서 관리하고, 장시간 GPU 계산은 별도 AI 서버가 담당합니다. 현재 요청 처리에 Redis·Kafka는 사용하지 않습니다.
 
 - **상태와 외부 요청:** 모델 상태와 불변 Outbox 명령을 함께 커밋하고, HTTP 전송은 선점 트랜잭션 밖에서 실행합니다. lease·lock token으로 오래된 Worker의 반영을 막습니다.
 - **완료 조건:** AI 최종 좌표 생성은 `WAITING_FOR_MODEL_UPLOAD`, 검증 GLB 연결까지 완료해야 `SUCCESS`입니다. HTTP 접수와 최종 완료를 구분합니다.

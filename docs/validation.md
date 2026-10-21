@@ -4,7 +4,7 @@
 
 ## 2026-10-21 공개 사본 로컬 재검증
 
-Java 21에서 `check bootJar` 성공. JUnit 170개 중 163개 통과·실패 0·MySQL migration 7개 skip(Docker 없음). Python `scripts/tests` 112개와 `deploy/tests` 71개 모두 통과했다. 로컬 총 통과 수는 346개이며 MySQL 7개는 성공으로 포함하지 않는다. CI는 Docker와 해당 7개 skip=0을 필수로 확인한다. 과거 10/16 준비 도구 135개와는 다른 실행이다.
+Java 21에서 `check bootJar --rerun-tasks` 성공. 최초 실행에서 Docker 부재로 건너뛴 MySQL 검사는 별도의 새 임시 MySQL 8.4 환경에서 전체 재실행했다. **JUnit 170개 전부 통과·실패 0·skip 0**이며 MySQL migration 7개도 포함한다. Python `scripts/tests` 112개와 `deploy/tests` 71개도 모두 통과해 로컬 총 통과 수는 **353개**다. 임시 DB만 사용·종료했고 기존 시연 DB는 사용하지 않았다. CI는 Docker와 MySQL 7개 skip=0, Compose 및 컨테이너 빌드를 별도로 확인한다. 로컬 Docker 이미지 빌드는 미실행이며 원격 결과는 Actions에서 확인한다. 과거 10/16 준비 도구 135개와는 다른 실행이다.
 
 ## 공개 코드에서 재현할 검사
 
