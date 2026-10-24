@@ -52,7 +52,7 @@ class Room3DModelServiceTest {
     @Test
     fun `분석 중에 보정 대기 웹훅을 받으면 WAITING_FOR_CORRECTION으로 변경된다`() {
         val model = createModel(ModelStatus.ANALYZING)
-        val roomData = """{"aiVertices":[],"aiEdges":[]}"""
+        val roomData = wireJson("ai")
 
         Mockito.`when`(room3DModelRepository.findByAiRoomIdForUpdate(aiRoomId))
             .thenReturn(Optional.of(model))
@@ -72,7 +72,7 @@ class Room3DModelServiceTest {
     @Test
     fun `AI 최종 좌표 웹훅을 받으면 프론트 모델 업로드 대기 상태로 변경된다`() {
         val model = createModel(ModelStatus.RECONSTRUCTING)
-        val roomData = """{"finalVertices":[],"finalEdges":[]}"""
+        val roomData = wireJson("final")
 
         Mockito.`when`(room3DModelRepository.findByAiRoomIdForUpdate(aiRoomId))
             .thenReturn(Optional.of(model))
@@ -92,7 +92,7 @@ class Room3DModelServiceTest {
     @Test
     fun `프론트가 최종 모델 URL을 전달하면 SUCCESS로 변경된다`() {
         val model = createModel(ModelStatus.WAITING_FOR_MODEL_UPLOAD)
-        model.roomData = """{"finalVertices":[],"finalEdges":[]}"""
+        model.roomData = wireJson("final")
 
         Mockito.`when`(room3DModelRepository.findByIdAndRoomId(10L, 1L))
             .thenReturn(Optional.of(model))
@@ -113,7 +113,7 @@ class Room3DModelServiceTest {
         assertEquals("glb", model.format)
         assertEquals(ModelStatus.SUCCESS, response.status)
         assertEquals("https://example.com/model.glb", response.modelUrl)
-        assertEquals("""{"finalVertices":[],"finalEdges":[]}""", model.roomData)
+        assertEquals(wireJson("final"), model.roomData)
     }
 
     @Test
@@ -203,8 +203,8 @@ class Room3DModelServiceTest {
                 AiRoomResponseDto(
                     id = aiRoomId,
                     status = "completed",
-                    finalVertices = listOf(finalVertex),
-                    finalEdges = emptyList()
+                    finalVertices = wireVertices(finalVertex),
+                    finalEdges = wireEdges(finalVertex.id)
                 )
             )
 
@@ -212,8 +212,8 @@ class Room3DModelServiceTest {
         val roomData = response.roomData as Map<*, *>
 
         assertEquals(ModelStatus.WAITING_FOR_MODEL_UPLOAD, model.status)
-        assertEquals(1, (roomData["finalVertices"] as List<*>).size)
-        assertEquals(emptyList<Any>(), roomData["finalEdges"])
+        assertEquals(2, (roomData["finalVertices"] as List<*>).size)
+        assertEquals(1, (roomData["finalEdges"] as List<*>).size)
     }
 
     @Test
@@ -235,18 +235,18 @@ class Room3DModelServiceTest {
                 AiRoomResponseDto(
                     id = aiRoomId,
                     status = "waiting_for_correction",
-                    aiVertices = listOf(analyzedVertex),
-                    aiEdges = emptyList()
+                    aiVertices = wireVertices(analyzedVertex),
+                    aiEdges = wireEdges(analyzedVertex.id)
                 )
             )
 
         val response = service.refreshFromAi(1L)
         val roomData = response.roomData as Map<*, *>
-        val vertex = (roomData["aiVertices"] as List<*>).single() as Map<*, *>
+        val vertex = (roomData["aiVertices"] as List<*>).first() as Map<*, *>
 
         assertEquals(ModelStatus.WAITING_FOR_CORRECTION, response.status)
         assertEquals("analyzed-vertex", vertex["id"])
-        assertEquals(emptyList<Any>(), roomData["aiEdges"])
+        assertEquals(1, (roomData["aiEdges"] as List<*>).size)
     }
 
     @Test
@@ -576,14 +576,14 @@ class Room3DModelServiceTest {
                 AiRoomResponseDto(
                     id = aiRoomId,
                     status = "completed",
-                    finalVertices = listOf(finalVertex),
-                    finalEdges = emptyList()
+                    finalVertices = wireVertices(finalVertex),
+                    finalEdges = wireEdges(finalVertex.id)
                 )
             )
 
         val response = service.refreshFromAi(1L)
         val roomData = response.roomData as Map<*, *>
-        val vertex = (roomData["finalVertices"] as List<*>).single() as Map<*, *>
+        val vertex = (roomData["finalVertices"] as List<*>).first() as Map<*, *>
 
         assertEquals(ModelStatus.WAITING_FOR_MODEL_UPLOAD, response.status)
         assertEquals("final-vertex", vertex["id"])
@@ -593,8 +593,7 @@ class Room3DModelServiceTest {
     @Test
     fun `업로드 대기 중 저장된 최종 좌표는 늦은 AI 상태 재조회로 덮어쓰지 않는다`() {
         val model = createModel(ModelStatus.WAITING_FOR_MODEL_UPLOAD)
-        model.roomData =
-            """{"finalVertices":[{"id":"kept","x":1.0,"y":2.0,"z":3.0}],"finalEdges":[]}"""
+        model.roomData = wireJson("final", "kept")
         Mockito.`when`(room3DModelRepository.findTopByRoomIdOrderByUploadedAtDesc(1L))
             .thenReturn(Optional.of(model))
         Mockito.`when`(room3DModelRepository.findByIdAndRoomId(10L, 1L))
@@ -604,16 +603,14 @@ class Room3DModelServiceTest {
                 AiRoomResponseDto(
                     id = aiRoomId,
                     status = "completed",
-                    finalVertices = listOf(
-                        VertexDto("late", 9.0, 9.0, 9.0)
-                    ),
-                    finalEdges = emptyList()
+                    finalVertices = wireVertices(VertexDto("late", 9.0, 9.0, 9.0)),
+                    finalEdges = wireEdges("late")
                 )
             )
 
         val response = service.refreshFromAi(1L)
         val roomData = response.roomData as Map<*, *>
-        val vertex = (roomData["finalVertices"] as List<*>).single() as Map<*, *>
+        val vertex = (roomData["finalVertices"] as List<*>).first() as Map<*, *>
 
         assertEquals("kept", vertex["id"])
     }
@@ -669,7 +666,7 @@ class Room3DModelServiceTest {
         service.handleAiWebhook(AiWebhookRequest(aiRoomId, RenderStatus.SUCCESS, """{"aiVertices":[],"aiEdges":[]}"""))
         assertEquals(ModelStatus.ANALYZING, model.status)
         assertEquals(null, model.roomData)
-        service.handleAiWebhook(AiWebhookRequest(aiRoomId, RenderStatus.SUCCESS, """{"aiVertices":[],"aiEdges":[]}""", AiWebhookPhase.ANALYZE))
+        service.handleAiWebhook(AiWebhookRequest(aiRoomId, RenderStatus.SUCCESS, wireJson("ai"), AiWebhookPhase.ANALYZE))
         assertEquals(ModelStatus.WAITING_FOR_CORRECTION, model.status)
     }
 
@@ -702,14 +699,14 @@ class Room3DModelServiceTest {
         Mockito.`when`(room3DModelRepository.findByIdAndRoomId(10L, 1L)).thenReturn(Optional.of(model))
         Mockito.`when`(aiServerClient.getRoom(aiRoomId)).thenReturn(AiRoomResponseDto(
             id = aiRoomId, status = "completed",
-            finalVertices = listOf(VertexDto("native", 4.0, 3.0, 2.5)),
-            finalEdges = emptyList(), viewerUp = listOf(0.0, 0.0, 1.0)
+            finalVertices = wireVertices(VertexDto("native", 4.0, 3.0, 2.5)),
+            finalEdges = wireEdges("native"), viewerUp = listOf(0.0, 0.0, 1.0)
         ))
         val response = service.refreshFromAi(1L, 10L)
         val data = response.roomData as Map<*, *>
         assertEquals(ModelStatus.WAITING_FOR_MODEL_UPLOAD, response.status)
         assertEquals(listOf(0.0, 0.0, 1.0), data["viewerUp"])
-        val point = (data["finalVertices"] as List<*>).single() as Map<*, *>
+        val point = (data["finalVertices"] as List<*>).first() as Map<*, *>
         assertEquals(4.0, point["x"]); assertEquals(3.0, point["y"]); assertEquals(2.5, point["z"])
     }
 
@@ -725,11 +722,150 @@ class Room3DModelServiceTest {
             assertEquals(ModelStatus.RECONSTRUCTING, model.status)
             assertEquals(null, model.roomData)
         }
-        val valid = """{"finalVertices":[],"finalEdges":[],"viewerUp":[0,0,1]}"""
+        val valid = wireJson("final").dropLast(1) + ""","viewerUp":[0,0,1]}"""
         service.handleAiWebhook(AiWebhookRequest(aiRoomId, RenderStatus.SUCCESS, valid, AiWebhookPhase.RECONSTRUCT))
         assertEquals(ModelStatus.WAITING_FOR_MODEL_UPLOAD, model.status)
         assertEquals(valid, model.roomData)
     }
+
+    @Test
+    fun `empty analysis geometry cannot advance either managed or legacy callback jobs`() {
+        for (sourceType in listOf(ModelSourceType.LEGACY_AI, ModelSourceType.AI_PIPELINE)) {
+            for (status in listOf(RenderStatus.WAITING_FOR_CORRECTION, RenderStatus.SUCCESS)) {
+                val model = createModel(ModelStatus.ANALYZING).apply { this.sourceType = sourceType }
+                Mockito.`when`(room3DModelRepository.findByAiRoomIdForUpdate(aiRoomId)).thenReturn(Optional.of(model))
+                assertThrows(IllegalArgumentException::class.java) {
+                    service.handleAiWebhook(AiWebhookRequest(aiRoomId, status,
+                        """{"aiVertices":[],"aiEdges":[]}""", AiWebhookPhase.ANALYZE))
+                }
+                assertEquals(ModelStatus.ANALYZING, model.status)
+                assertEquals(null, model.roomData)
+            }
+        }
+    }
+
+    @Test
+    fun `empty point-only self-loop and collapsed final callback results never become upload ready`() {
+        val vertices = wireVertices()
+        val invalidResults = listOf(
+            emptyList<VertexDto>() to emptyList<EdgeDto>(),
+            vertices to emptyList(),
+            vertices to listOf(EdgeDto("self", "start", "start")),
+            listOf(vertices.first(), vertices.last().copy(x = vertices.first().x)) to wireEdges()
+        )
+        for ((points, edges) in invalidResults) {
+            val original = wireJson("ai")
+            val model = createModel(ModelStatus.RECONSTRUCTING).apply {
+                sourceType = ModelSourceType.AI_PIPELINE
+                roomData = original
+            }
+            Mockito.`when`(room3DModelRepository.findByAiRoomIdForUpdate(aiRoomId)).thenReturn(Optional.of(model))
+            val payload = jsonMapper.writeValueAsString(mapOf("finalVertices" to points, "finalEdges" to edges))
+            assertThrows(IllegalArgumentException::class.java) {
+                service.handleAiWebhook(AiWebhookRequest(aiRoomId, RenderStatus.SUCCESS, payload, AiWebhookPhase.RECONSTRUCT))
+            }
+            assertEquals(ModelStatus.RECONSTRUCTING, model.status)
+            assertEquals(original, model.roomData)
+            assertEquals(null, model.modelUrl)
+        }
+    }
+
+    @Test
+    fun `invalid result fields in progress callback cannot overwrite stored geometry`() {
+        for ((state, phase) in listOf(
+            ModelStatus.ANALYZING to AiWebhookPhase.ANALYZE,
+            ModelStatus.RECONSTRUCTING to AiWebhookPhase.RECONSTRUCT
+        )) {
+            val status = if (state == ModelStatus.ANALYZING) RenderStatus.ANALYZING else RenderStatus.RECONSTRUCTING
+            val prefix = if (state == ModelStatus.ANALYZING) "ai" else "final"
+            val original = wireJson("ai")
+            val model = createModel(state).apply {
+                sourceType = ModelSourceType.AI_PIPELINE
+                roomData = original
+            }
+            Mockito.`when`(room3DModelRepository.findByAiRoomIdForUpdate(aiRoomId)).thenReturn(Optional.of(model))
+            assertThrows(IllegalArgumentException::class.java) {
+                service.handleAiWebhook(AiWebhookRequest(aiRoomId, status,
+                    """{"${prefix}Vertices":[],"${prefix}Edges":[]}""", phase))
+            }
+            assertEquals(state, model.status)
+            assertEquals(original, model.roomData)
+        }
+    }
+
+    @Test
+    fun `polling empty or collapsed AI results preserves phase and previous payload`() {
+        for (state in listOf(ModelStatus.ANALYZING, ModelStatus.RECONSTRUCTING)) {
+            for ((points, edges) in listOf(
+                emptyList<VertexDto>() to emptyList<EdgeDto>(),
+                wireVertices() to emptyList(),
+                wireVertices().map { it.copy(x = 1.0) } to wireEdges()
+            )) {
+                val original = """{"progress":"running"}"""
+                val model = createModel(state).apply { roomData = original }
+                Mockito.`when`(room3DModelRepository.findById(10L)).thenReturn(Optional.of(model))
+                Mockito.`when`(room3DModelRepository.findByIdAndRoomId(10L, 1L)).thenReturn(Optional.of(model))
+                Mockito.`when`(aiServerClient.getRoom(aiRoomId)).thenReturn(AiRoomResponseDto(
+                    id = aiRoomId,
+                    status = if (state == ModelStatus.ANALYZING) "pending_correction" else "completed",
+                    aiVertices = points, aiEdges = edges, finalVertices = points, finalEdges = edges
+                ))
+                val result = service.refreshFromAi(1L, 10L)
+                assertEquals(state, result.status)
+                assertEquals(original, model.roomData)
+                assertEquals(null, model.modelUrl)
+            }
+        }
+    }
+
+    @Test
+    fun `verified upload cannot complete a preexisting empty final result`() {
+        val model = createModel(ModelStatus.WAITING_FOR_MODEL_UPLOAD).apply {
+            sourceType = ModelSourceType.AI_PIPELINE
+            roomData = """{"finalVertices":[],"finalEdges":[]}"""
+        }
+        Mockito.`when`(room3DModelRepository.findByIdAndRoomId(10L, 1L)).thenReturn(Optional.of(model))
+        assertThrows(IllegalStateException::class.java) {
+            service.completeVerifiedModelUpload(1L, 10L, 50L, 1520L)
+        }
+        assertEquals(ModelStatus.WAITING_FOR_MODEL_UPLOAD, model.status)
+        assertEquals(null, model.modelUrl)
+    }
+
+    @Test
+    fun `legacy generic coordinate names remain accepted for a usable analysis result`() {
+        val model = createModel(ModelStatus.ANALYZING)
+        Mockito.`when`(room3DModelRepository.findByAiRoomIdForUpdate(aiRoomId)).thenReturn(Optional.of(model))
+        val payload = jsonMapper.writeValueAsString(mapOf("vertices" to wireVertices(), "edges" to wireEdges()))
+        service.handleAiWebhook(AiWebhookRequest(aiRoomId, RenderStatus.SUCCESS, payload))
+        assertEquals(ModelStatus.WAITING_FOR_CORRECTION, model.status)
+        assertEquals(payload, model.roomData)
+    }
+
+    @Test
+    fun `wrong phase empty success callback cannot invalidate a running reconstruction`() {
+        val original = wireJson("ai")
+        val model = createModel(ModelStatus.RECONSTRUCTING).apply {
+            sourceType = ModelSourceType.AI_PIPELINE
+            roomData = original
+        }
+        Mockito.`when`(room3DModelRepository.findByAiRoomIdForUpdate(aiRoomId)).thenReturn(Optional.of(model))
+        service.handleAiWebhook(AiWebhookRequest(aiRoomId, RenderStatus.SUCCESS,
+            """{"aiVertices":[],"aiEdges":[]}""", AiWebhookPhase.ANALYZE))
+        assertEquals(ModelStatus.RECONSTRUCTING, model.status)
+        assertEquals(original, model.roomData)
+    }
+
+    private fun wireVertices(first: VertexDto = VertexDto("start", 1.0, 2.0, 3.0)) = listOf(
+        first, VertexDto("${first.id}-end", first.x + 1.0, first.y, first.z, imageIndex = first.imageIndex)
+    )
+
+    private fun wireEdges(firstId: String = "start") = listOf(EdgeDto("edge", firstId, "$firstId-end"))
+
+    private fun wireJson(prefix: String, firstId: String = "start") = jsonMapper.writeValueAsString(mapOf(
+        "${prefix}Vertices" to wireVertices(VertexDto(firstId, 1.0, 2.0, 3.0)),
+        "${prefix}Edges" to wireEdges(firstId)
+    ))
 
     private fun createModel(status: ModelStatus): Room3DModel {
         val property = Property(

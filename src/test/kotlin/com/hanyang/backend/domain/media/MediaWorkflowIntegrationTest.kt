@@ -142,11 +142,11 @@ class MediaWorkflowIntegrationTest @Autowired constructor(
         val model=modelRecords.findById(first.modelId).orElseThrow()
         assertEquals(ModelSourceType.AI_PIPELINE,model.sourceType)
         assertEquals("http://localhost:8080/api/internal/ai/assets/${photo.id}/content",model.originalImageUrl)
-        pipeline.handleAiWebhook(AiWebhookRequest(model.aiRoomId,RenderStatus.WAITING_FOR_CORRECTION,"""{"aiVertices":[{"id":"a","x":0,"y":0,"z":0}],"aiEdges":[]}""",AiWebhookPhase.ANALYZE))
+        pipeline.handleAiWebhook(AiWebhookRequest(model.aiRoomId,RenderStatus.WAITING_FOR_CORRECTION,"""{"aiVertices":[{"id":"a","x":0,"y":0,"z":0},{"id":"b","x":1,"y":0,"z":0}],"aiEdges":[{"id":"ab","startVertexId":"a","endVertexId":"b"}]}""",AiWebhookPhase.ANALYZE))
         managedModels.reconstruct(space,first.modelId,CorrectionRequestDto(listOf(VertexDto("aaaaaaaa-0000-0000-0000-000000000001",0.0,0.0,0.0,imageIndex=0)),emptyList()))
         assertEquals(ModelStatus.RECONSTRUCTING,managedModels.get(space,first.modelId).status)
         assertEquals(ModelStatus.ANALYZING,managedModels.get(space,second.modelId).status)
-        pipeline.handleAiWebhook(AiWebhookRequest(model.aiRoomId,RenderStatus.SUCCESS,"""{"finalVertices":[{"id":"a","x":0,"y":0,"z":0}],"finalEdges":[]}""",AiWebhookPhase.RECONSTRUCT))
+        pipeline.handleAiWebhook(AiWebhookRequest(model.aiRoomId,RenderStatus.SUCCESS,"""{"finalVertices":[{"id":"a","x":0,"y":0,"z":0},{"id":"b","x":1,"y":0,"z":0}],"finalEdges":[{"id":"ab","startVertexId":"a","endVertexId":"b"}]}""",AiWebhookPhase.RECONSTRUCT))
         val bytes=triangleGlb();val session=media.create(UploadSessionRequest(unit,MediaKind.MODEL,"model/gltf-binary",bytes.size.toLong(),spaceId=space,modelId=first.modelId))
         media.upload(session.id,"model/gltf-binary",bytes.inputStream());val asset=media.complete(session.id)
         assertEquals(first.modelId,asset.sourceModelId)
@@ -203,9 +203,11 @@ class MediaWorkflowIntegrationTest @Autowired constructor(
         val model=modelRecords.findById(created.modelId).orElseThrow()
         val points=listOf(
             VertexDto("aaaaaaaa-0000-0000-0000-000000000001",1.0,1.0,0.0,0,"cccccccc-0000-0000-0000-000000000001"),
-            VertexDto("bbbbbbbb-0000-0000-0000-000000000001",1.0,1.0,0.0,1,"cccccccc-0000-0000-0000-000000000001")
+            VertexDto("bbbbbbbb-0000-0000-0000-000000000001",1.0,1.0,0.0,1,"cccccccc-0000-0000-0000-000000000001"),
+            VertexDto("aaaaaaaa-0000-0000-0000-000000000002",1.5,1.0,0.0,0,"cccccccc-0000-0000-0000-000000000002")
         )
-        val payload=JsonMapper.builder().build().writeValueAsString(mapOf("aiVertices" to points,"aiEdges" to emptyList<EdgeDto>()))
+        val edges=listOf(EdgeDto("eeeeeeee-0000-0000-0000-000000000002",points[0].id,points[2].id))
+        val payload=JsonMapper.builder().build().writeValueAsString(mapOf("aiVertices" to points,"aiEdges" to edges))
         pipeline.handleAiWebhook(AiWebhookRequest(model.aiRoomId,RenderStatus.WAITING_FOR_CORRECTION,payload,AiWebhookPhase.ANALYZE))
         assertEquals(ModelStatus.WAITING_FOR_CORRECTION,managedModels.get(space,created.modelId).status)
         return Triple(space,created.modelId,points)

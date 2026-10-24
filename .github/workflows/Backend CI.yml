@@ -45,6 +45,9 @@ jobs:
       - name: Verify local backup and process ownership safeguards
         run: python3 -B -m unittest discover -s scripts/tests -p 'test_*.py' -v
 
+      - name: Verify browser V2 integration contract
+        run: node --test integration/tests/*.test.mjs
+
       - name: Run tests and build executable JAR
         run: ./gradlew check bootJar --no-daemon --stacktrace
 

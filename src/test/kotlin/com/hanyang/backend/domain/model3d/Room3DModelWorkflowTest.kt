@@ -125,7 +125,7 @@ class Room3DModelWorkflowTest {
             edges = emptyList()
         )
         val finalRoomData =
-            """{"finalVertices":[{"id":"vertex-1","x":1.0,"y":2.0,"z":3.0}],"finalEdges":[]}"""
+            """{"finalVertices":[{"id":"vertex-1","x":1.0,"y":2.0,"z":3.0},{"id":"vertex-2","x":2.0,"y":2.0,"z":3.0}],"finalEdges":[{"id":"edge-1","startVertexId":"vertex-1","endVertexId":"vertex-2"}]}"""
 
         Mockito.`when`(modelRepository.findFirstByRoomIdOrderByUploadedAtDesc(1L))
             .thenReturn(Optional.of(model))
@@ -153,8 +153,8 @@ class Room3DModelWorkflowTest {
 
         assertEquals(ModelStatus.WAITING_FOR_MODEL_UPLOAD, waitingForUpload.status)
         assertEquals(null, waitingForUpload.modelUrl)
-        assertEquals(1, (waitingRoomData["finalVertices"] as List<*>).size)
-        assertEquals(emptyList<Any>(), waitingRoomData["finalEdges"])
+        assertEquals(2, (waitingRoomData["finalVertices"] as List<*>).size)
+        assertEquals(1, (waitingRoomData["finalEdges"] as List<*>).size)
 
         val completed = service.completeModelUpload(
             roomId = 1L,
@@ -174,8 +174,8 @@ class Room3DModelWorkflowTest {
         assertEquals("https://example.com/models/room.glb", finalStatus.modelUrl)
         assertEquals(BigDecimal("12.34"), model.fileSizeMb)
         assertEquals("glb", model.format)
-        assertEquals(1, (completedRoomData["finalVertices"] as List<*>).size)
-        assertEquals(emptyList<Any>(), completedRoomData["finalEdges"])
+        assertEquals(2, (completedRoomData["finalVertices"] as List<*>).size)
+        assertEquals(1, (completedRoomData["finalEdges"] as List<*>).size)
     }
 
     @Test
