@@ -49,6 +49,9 @@ class SecurityConfig(
                 it.requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/kakao", "/api/auth/kakao/code", "/api/auth/google", "/api/auth/refresh").permitAll()
                 it.requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness").permitAll()
                 it.requestMatchers(HttpMethod.GET, "/api/v2/listings", "/api/v2/listings/*", "/api/v2/listings/*/assets/*").permitAll()
+                // Reviewed catalog files are public; private user media stays behind ownership checks.
+                it.requestMatchers(HttpMethod.GET, "/api/v2/furniture", "/api/v2/furniture/*/content").permitAll()
+                it.requestMatchers(HttpMethod.HEAD, "/api/v2/furniture/*/content").permitAll()
                 it.requestMatchers(HttpMethod.POST, "/api/internal/ai/webhook").permitAll()
                 it.requestMatchers(HttpMethod.GET, "/api/internal/ai/assets/*/content").permitAll()
                 it.requestMatchers("/api/auth/me", "/api/v2/**").authenticated()
@@ -66,9 +69,9 @@ class SecurityConfig(
         require(origins.isNotEmpty() && origins.none { it == "*" }) { "명시적인 CORS 허용 출처를 설정해 주세요." }
         val configuration = CorsConfiguration().apply {
             setAllowedOrigins(origins)
-            allowedMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-            allowedHeaders = listOf("Authorization", "Content-Type", "Accept", "If-Match", "Idempotency-Key")
-            exposedHeaders = listOf("Location")
+            allowedMethods = listOf("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+            allowedHeaders = listOf("Authorization", "Content-Type", "Accept", "If-Match", "Idempotency-Key", "Range", "If-Range", "If-None-Match")
+            exposedHeaders = listOf("Location", "ETag", "Content-Length", "Content-Range", "Accept-Ranges")
             allowCredentials = false
             maxAge = 3600L
         }

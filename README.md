@@ -12,6 +12,7 @@
 | [아키텍처](docs/architecture.md) | 도메인 관계와 트랜잭션·파일·AI 경계 |
 | [검증 기록](docs/validation.md) | 자동화 검사와 실제 외부 연동의 확인 범위 |
 | [API 계약](docs/frontend-api-contract.md) | 현재 V2 API와 프론트·AI 연동 규칙 |
+| [V2 클라이언트 모듈](integration/README.md) | 사진 4장·작업 ID·검증 파일 저장·로컬 가구 연결 코드 |
 
 ## 구현한 사용자 흐름
 
@@ -35,6 +36,8 @@
 | 확장자·파일 크기만으로 업로드를 신뢰 | 실제 이미지·GLB 구조 검증, 불변 최종 키·SHA·S3 버전 기록 | [MediaService](src/main/kotlin/com/hanyang/backend/domain/media/MediaService.kt), [GlbValidation](src/main/kotlin/com/hanyang/backend/domain/media/GlbValidation.kt) |
 | 사진 보정이 이미지 밖 좌표나 다른 사진을 참조 | 서버가 확인한 이미지 크기·사진 귀속·원본 점 식별자 검사 | [ManagedModelService](src/main/kotlin/com/hanyang/backend/domain/model3d/ManagedModelService.kt) |
 | 재시작·스키마 변경 후 데이터 보존 여부가 불명확 | MySQL/Flyway, 영속 media, 별도 DB 복원·전체 행/DDL·파일 해시 검사 | [Migration](src/main/resources/db/migration), [복원 검사](scripts/verify_local_backup.py) |
+| 빈 AI 결과가 보정·파일 업로드 준비로 처리됨 | 유효한 점·간선과 길이가 있는 선분 확인, 잘못된 결과의 상태·파일 완료 차단 | [Room3DModelService](src/main/kotlin/com/hanyang/backend/domain/model3d/Room3DModelService.kt) |
+| 가구가 CDN 파일명·응답·CORS에 종속됨 | 검증한 로컬 6종 카탈로그, 고정 파일·해시·미터 크기, GET/HEAD·ETag·Range | [FurnitureCatalog](src/main/kotlin/com/hanyang/backend/domain/furniture/FurnitureCatalog.kt) |
 
 ## 아키텍처
 
@@ -84,6 +87,8 @@ Outbox는 **at-least-once 전달**입니다. 동일 요청의 재전송이 가�
 | POST `/api/v2/spaces/{spaceId}/models/analyze` | 사진 asset ID 4개로 분석 접수 |
 | GET `/api/v2/spaces/{spaceId}/models/{modelId}` | 명시적 모델 상태·좌표 조회 |
 | POST `/api/v2/spaces/{spaceId}/models/{modelId}/reconstruct` | 사진별 사용자 보정·재구성 접수 |
+| GET `/api/v2/furniture` | 가구 6종의 검증 파일 URL·미터 크기·준비 상태 |
+| GET/HEAD `/api/v2/furniture/{type}/content` | 검증한 로컬 GLB·조건부 요청·단일 byte range |
 | GET `/api/v2/listings`, GET `/api/v2/listings/map` | 공개 목록·지도 범위 검색 |
 | POST `/api/v2/units/{unitId}/listings` | 거래 매물 초안 생성 |
 | POST `/api/v2/listings/{listingId}/publish` | 버전·필수 정보 확인 후 공개 |
@@ -93,6 +98,8 @@ Outbox는 **at-least-once 전달**입니다. 동일 요청의 재전송이 가�
 기존 `/api/rooms/**` 등 요청 본문의 사용자 ID를 신뢰하던 경로는 차단합니다. V2는 단순한 URL 이름 변경이 아니라 인증·귀속·파일·모델 식별 규칙의 변경입니다. 전체 계약은 [API 문서](docs/frontend-api-contract.md)를 참고합니다.
 
 ## 공개 저장소만으로 실행하기
+
+평가용 개인 PC 연동과 가구 파일 준비 명령은 [브라우저용 V2 클라이언트 안내](integration/README.md)에 있습니다. 가구 파일은 `MEDIA_LOCAL_DIRECTORY/furniture`에 별도로 준비하며 Git·JAR에 포함하지 않습니다. 프론트·AI 저장소는 이 모듈로 자동 변경하지 않습니다.
 
 필수 환경은 Docker Engine/Compose v2입니다. 기본 Compose는 **백엔드 + MySQL**을 실행하며, 프론트·AI 소스가 없어도 서버 기동과 공개 API·권한 경계를 확인할 수 있습니다.
 

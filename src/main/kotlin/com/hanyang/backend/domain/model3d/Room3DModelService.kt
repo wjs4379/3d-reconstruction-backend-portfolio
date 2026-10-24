@@ -444,6 +444,23 @@ class Room3DModelService(
             }
         }
 
+        // Progress notifications may omit geometry. Once a result field is
+        // present, an empty or collapsed result must not replace usable data.
+        if (parsedRoomData != null && request.status != RenderStatus.FAILED) {
+            val resultFields = when (currentStatus) {
+                ModelStatus.ANALYZING -> listOf("aiVertices" to "aiEdges", "vertices" to "edges")
+                ModelStatus.RECONSTRUCTING -> listOf("finalVertices" to "finalEdges")
+                else -> emptyList()
+            }
+            resultFields.forEach { (verticesField, edgesField) ->
+                if (parsedRoomData.containsKey(verticesField) || parsedRoomData.containsKey(edgesField)) {
+                    require(hasCoordinatePayload(parsedRoomData[verticesField], parsedRoomData[edgesField])) {
+                        "AI 결과에는 서로 다른 좌표를 잇는 유효한 점과 간선이 필요합니다."
+                    }
+                }
+            }
+        }
+
         model.status = resolveWebhookStatus(
             current = currentStatus,
             incoming = request.status,
@@ -710,8 +727,10 @@ class Room3DModelService(
     ): Boolean {
         val vertices = verticesValue as? List<*> ?: return false
         val edges = edgesValue as? List<*> ?: return false
-        if (vertices.size > AiPayloadLimits.MAX_VERTICES || edges.size > AiPayloadLimits.MAX_EDGES) return false
+        if (vertices.isEmpty() || edges.isEmpty() ||
+            vertices.size > AiPayloadLimits.MAX_VERTICES || edges.size > AiPayloadLimits.MAX_EDGES) return false
         val vertexIds = mutableSetOf<String>()
+        val positions = mutableMapOf<String, List<Double>>()
 
         for (vertexValue in vertices) {
             val vertex = vertexValue as? Map<*, *> ?: return false
@@ -728,6 +747,7 @@ class Room3DModelService(
             ) {
                 return false
             }
+            positions[id] = listOf("x", "y", "z").map { (vertex[it] as Number).toDouble() }
             val imageIndex = vertex["imageIndex"]
             if (imageIndex != null) {
                 if (imageIndex !is Number) {
@@ -753,6 +773,7 @@ class Room3DModelService(
         }
 
         val edgeIds = mutableSetOf<String>()
+        var hasUsableEdge = false
         for (edgeValue in edges) {
             val edge = edgeValue as? Map<*, *> ?: return false
             val id = (edge["id"] as? String)
@@ -772,20 +793,26 @@ class Room3DModelService(
             ) {
                 return false
             }
+            if (positions.getValue(startVertexId).zip(positions.getValue(endVertexId)).any { (start, end) -> start != end }) {
+                hasUsableEdge = true
+            }
         }
 
-        return true
+        return hasUsableEdge
     }
 
     private fun hasCoordinatePayload(
         vertices: List<VertexDto>?,
-        edges: List<EdgeDto>?
+        edges: List<EdgeDto>?,
+        requireUsableGeometry: Boolean = true
     ): Boolean {
         if (vertices == null || edges == null || vertices.size > AiPayloadLimits.MAX_VERTICES || edges.size > AiPayloadLimits.MAX_EDGES) {
             return false
         }
+        if (requireUsableGeometry && (vertices.isEmpty() || edges.isEmpty())) return false
 
         val vertexIds = mutableSetOf<String>()
+        val positions = mutableMapOf<String, List<Double>>()
         for (vertex in vertices) {
             if (
                 vertex.id.isBlank() ||
@@ -796,9 +823,11 @@ class Room3DModelService(
             ) {
                 return false
             }
+            positions[vertex.id] = listOf(vertex.x, vertex.y, vertex.z)
         }
 
         val edgeIds = mutableSetOf<String>()
+        var hasUsableEdge = false
         for (edge in edges) {
             if (
                 edge.id.isBlank() ||
@@ -810,9 +839,12 @@ class Room3DModelService(
             ) {
                 return false
             }
+            if (positions.getValue(edge.startVertexId).zip(positions.getValue(edge.endVertexId)).any { (start, end) -> start != end }) {
+                hasUsableEdge = true
+            }
         }
 
-        return true
+        return !requireUsableGeometry || hasUsableEdge
     }
 
     private fun isFiniteNumber(value: Any?): Boolean {
@@ -850,7 +882,8 @@ class Room3DModelService(
         require(
             hasCoordinatePayload(
                 vertices = request.vertices,
-                edges = request.edges
+                edges = request.edges,
+                requireUsableGeometry = false
             )
         ) {
             "보정 좌표의 ID·좌표 값과 edge 연결 관계를 확인해 주세요."

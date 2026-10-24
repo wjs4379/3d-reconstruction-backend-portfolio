@@ -39,6 +39,9 @@ app:
     backend-base-url: ${APP_BACKEND_BASE_URL:}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  furniture:
+    # Reviewed catalog GLBs live with local media and are not bundled into Git/JAR.
+    local-directory: ${FURNITURE_LOCAL_DIRECTORY:${app.media.local-directory}/furniture}
   oauth:
     google:
       client-id: ${GOOGLE_CLIENT_ID:}

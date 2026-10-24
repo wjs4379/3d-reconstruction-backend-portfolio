@@ -1,6 +1,14 @@
 # 검증 범위와 현재 남은 연결
 
-기준일: **2026-10-21**. 공개 사본의 현재 검사와 과거 팀 환경의 실행 기록을 분리한다. 과거 성공 기록이 오늘의 서버 가동이나 전체 앱의 완성을 의미하지 않는다.
+기준일: **2026-10-24**. 코드·도구 검사와 과거 팀 환경의 실행 기록을 분리한다. 과거 성공 기록이 오늘의 서버 가동이나 전체 앱의 완성을 의미하지 않는다.
+
+## 2026-10-24 로컬 연동 코드 검증
+
+격리된 새 MySQL 8.4 환경에서 Java 21의 `check bootJar --rerun-tasks`를 실행했다. **JUnit 192개 전부 통과, 실패·오류·skip 0**, MySQL 이행 7개를 포함한다. Python 실행 도구 **120개**, 배포 설정 **71개**, [브라우저 V2 클라이언트](../integration/tests/estate-client.test.mjs) **15개**도 통과해 총 **398개**다. 기존 시연 DB는 사용하지 않았다.
+
+이번 변경은 빈 AI 결과의 준비 상태 진입·기존 데이터 덮어쓰기 차단, 검증 로컬 가구 6종·단일 range·조건부 읽기, 사진 4장과 명시 modelId를 유지하는 인증 업로드 클라이언트다. 가구 가져오기 도구는 기존 파일을 네트워크 없이 검증하고 별도 런타임에 복사한다. 실제 가구 파일·사진·DB·키는 공개 커밋에 포함하지 않는다. 실제 Kakao·GPU 추론을 이 검사 수로 대신하지 않는다.
+
+별도 임시 H2 서버와 모의 AI HTTP 서버에서 V2 클라이언트의 사진 4장 업로드, Outbox 명령·사진 읽기·단계별 callback, 보정·재구성, 기존 가구 포함 GLB의 실제 검증 저장, 공개 매물·지도·파일 재조회를 81개 조건으로 확인했다. 사진은 로컬에 보존한 팀 원본이며 외부 서버로 전송하지 않았다. 실제 GPU 계산과 새 가구 편집 UI를 실행한 증거는 아니다.
 
 ## 2026-10-21 공개 사본 로컬 재검증
 
@@ -21,6 +29,7 @@ Java 21에서 `check bootJar --rerun-tasks` 성공. 최초 실행에서 Docker �
 ./gradlew test
 python3 -B -m unittest discover -s scripts/tests -p 'test_*.py' -v
 python3 -B -m unittest discover -s deploy/tests -p 'test_*.py' -v
+node --test integration/tests/*.test.mjs
 ```
 
 일반 서비스/JPA 시험은 H2를 사용한다. [MySQL 이행 검사](../src/test/kotlin/com/hanyang/backend/migration/MySqlMigrationIntegrationTest.kt)는 Docker 또는 별도로 준비한 격리 MySQL 테스트 schema가 필요하다. 환경 부족으로 skip됐다면 MySQL 검증 성공으로 계산하지 않는다. 테스트 schema를 정리하므로 앱 DB에 연결해 실행하지 않는다.

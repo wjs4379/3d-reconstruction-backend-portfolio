@@ -20,6 +20,7 @@ import org.springframework.test.context.TestPropertySource
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
@@ -168,10 +169,41 @@ class SecurityAccessTest {
             .andExpect(status().isForbidden)
     }
 
+    @Test
+    fun `reviewed furniture reads are public without opening private assets or legacy writes`() {
+        mvc.perform(get("/api/v2/furniture")).andExpect(status().isOk)
+        mvc.perform(get("/api/v2/furniture/microwave/content")).andExpect(status().isOk)
+        mvc.perform(head("/api/v2/furniture/microwave/content")).andExpect(status().isOk)
+        mvc.perform(get("/api/v2/media/assets/48/content")).andExpect(status().isUnauthorized)
+        mvc.perform(post("/api/v2/furniture")).andExpect(status().isUnauthorized)
+        mvc.perform(post("/api/s3/presign").header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `configured origin can preflight furniture byte ranges and read conditional response headers`() {
+        mvc.perform(options("/api/v2/furniture/microwave/content")
+            .header(HttpHeaders.ORIGIN, "http://localhost:5173")
+            .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "HEAD")
+            .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "range,if-range,if-none-match"))
+            .andExpect(status().isOk)
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:5173"))
+        mvc.perform(get("/api/v2/furniture/microwave/content").header(HttpHeaders.ORIGIN, "http://localhost:5173"))
+            .andExpect(status().isOk)
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "Location, ETag, Content-Length, Content-Range, Accept-Ranges"))
+        mvc.perform(options("/api/v2/furniture/microwave/content")
+            .header(HttpHeaders.ORIGIN, "https://untrusted.example")
+            .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET"))
+            .andExpect(status().isForbidden)
+    }
+
     @RestController
     class ProbeController(private val currentUser: CurrentUser) {
         @GetMapping("/api/v2/listings", "/api/v2/listings/{id}")
         fun publicListings() = mapOf("visible" to true)
+
+        @GetMapping("/api/v2/furniture", "/api/v2/furniture/{type}/content")
+        fun furniture() = mapOf("reviewed" to true)
 
         @GetMapping("/api/v2/me/listings")
         fun mine() = mapOf("ownerId" to currentUser.id())
